@@ -1,8 +1,9 @@
-import { wrapInTransaction, WrapInTransactionOptions } from './wrap-in-transaction';
+import { wrapInTransaction } from '.';
+import { TransactionOptions } from '../interfaces';
 
 export const runInTransaction = <Func extends (this: unknown) => ReturnType<Func>>(
   fn: Func,
-  options?: WrapInTransactionOptions,
+  options?: TransactionOptions,
 ) => {
   return wrapInTransaction(fn, options)();
 };

@@ -11,10 +11,9 @@
     "allowSyntheticDefaultImports": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "target": "es5",
+    "target": "es6",
     "sourceMap": true,
     "outDir": "dist",
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "test/**/*.ts", "dist", "temp"]
+  "include": ["src", "test"]
 }

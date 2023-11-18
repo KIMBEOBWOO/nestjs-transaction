@@ -1,33 +1,21 @@
 /**
- * Enumeration that represents transaction propagation behaviors for use with the see {@link Transactional} annotation
+ * Transaction propagation properties
  */
-export enum Propagation {
+export const Propagation = {
   /**
-   * Support a current transaction, throw an exception if none exists.
+   * Internal transactions participate in running external transactions (default properties)
+   * @description If there is already a transaction being performed in the execution context, participate in that transaction and do not create a new physical transactions.
    */
-  MANDATORY = 'MANDATORY',
+  REQUIRED: 'REQUIRED',
+
   /**
-   * Execute within a nested transaction if a current transaction exists, behave like `REQUIRED` else.
+   * Join if there is an external transaction
+   * @description If external transactions exist, they participate and proceed, and if not, they execute without transactions.
    */
-  NESTED = 'NESTED',
-  /**
-   * Execute non-transactionally, throw an exception if a transaction exists.
-   */
-  NEVER = 'NEVER',
-  /**
-   * Execute non-transactionally, suspend the current transaction if one exists.
-   */
-  NOT_SUPPORTED = 'NOT_SUPPORTED',
-  /**
-   * Support a current transaction, create a new one if none exists.
-   */
-  REQUIRED = 'REQUIRED',
-  /**
-   * Create a new transaction, and suspend the current transaction if one exists.
-   */
-  REQUIRES_NEW = 'REQUIRES_NEW',
-  /**
-   * Support a current transaction, execute non-transactionally if none exists.
-   */
-  SUPPORTS = 'SUPPORTS',
-}
+  SUPPORTS: 'SUPPORTS',
+} as const;
+
+/**
+ * Transaction propagation properties
+ */
+export type PropagationType = (typeof Propagation)[keyof typeof Propagation];

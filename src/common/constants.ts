@@ -1,9 +1,6 @@
-export const NAMESPACE_NAME = '@transactional/namespace';
-
-export const TYPEORM_HOOK_NAME = '@transactional/hook';
-
-export const TYPEORM_ENTITY_MANAGER_NAME = '@transactional/entity-manager';
-
-export const TYPEORM_DATA_SOURCE_NAME = '@transactional/data-source';
-
-export const TYPEORM_DATA_SOURCE_NAME_PREFIX = TYPEORM_DATA_SOURCE_NAME + '/';
+/**
+ * Transaction Lazy Decorator Token
+ */
+export const TRANSACTION_DECORATOR = Symbol('TRANSACTION_DECORATOR');
+export const DEFAULT_DATA_SOURCE_NAME = 'default' as const;
+export const TYPEORM_ENTITY_MANAGER_NAME = '@nestjs-transactional/entity-manager';

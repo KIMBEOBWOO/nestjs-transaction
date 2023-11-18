@@ -1,19 +1,31 @@
 {
-  "name": "typeorm-transactional",
-  "version": "0.5.0",
-  "description": "A Transactional Method Decorator for typeorm that uses cls-hooked to handle and propagate transactions between different repositories and service methods. Inpired by Spring Trasnactional Annotation and Sequelize CLS",
+  "name": "nestjs-transaction",
+  "version": "0.1.0",
+  "description": "A library that extracts and provides only some of the functions of the 'typeorm-transactional' npm module that are needed to operate in the Nestjs + TypeORM environment",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Aliheym/typeorm-transactional"
+    "url": "git+https://github.com/KIMBEOBWOO/nestjs-transaction.git"
   },
-  "author": {
-    "name": "Ohad David",
-    "email": "ohad.david@gmail.com"
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf ./dist",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
+    "test:set-up": "docker-compose -f test/docker-compose.yml up -d --build",
+    "test": "jest --detectOpenHandles",
+    "migration:generate": "bash ./scripts/migration.generate.sh",
+    "migration:run": "bash ./scripts/migration.run.sh",
+    "migration:revert": "bash ./scripts/migration.revert.sh",
+    "seed:run": "bash ./scripts/seed.run.sh"
   },
-  "readmeFilename": "README.md",
+  "engines": {
+    "node": ">=16"
+  },
   "keywords": [
+    "nestjs",
     "typescript",
     "typescript-orm",
     "typeorm",
@@ -23,51 +35,43 @@
     "isolation",
     "decorator"
   ],
-  "license": "MIT",
-  "scripts": {
-    "clean": "rm -rf ./dist",
-    "check:format": "prettier --check \"src/**/*.ts\"",
-    "check:lint": "eslint --cache \"src/**/*.ts\"",
-    "check": "npm run check:lint && npm run check:format",
-    "fix:format": "prettier --write \"src/**/*.ts\"",
-    "fix:lint": "npm run check:lint --fix",
-    "fix": "npm run fix:lint && npm run fix:format",
-    "build": "npm run clean && tsc -p tsconfig.json",
-    "setup-test-db": "npm run teardown-test-db; docker compose -f tests/docker-compose.yaml up -d --wait",
-    "teardown-test-db": "docker compose -f tests/docker-compose.yaml down --remove-orphans -v",
-    "test": "npm run setup-test-db && jest"
+  "author": {
+    "name": "KIMBEOBWOO",
+    "email": "qjqdn1568@naver.com"
   },
-  "dependencies": {
-    "@types/cls-hooked": "^4.3.3",
-    "cls-hooked": "^4.2.2",
-    "semver": "^7.5.1"
+  "license": "MIT",
+  "peerDependencies": {
+    "@nestjs/common": "^8 || ^9 || ^10",
+    "@nestjs/core": "^8 || ^9 || ^10",
+    "typeorm": ">= 0.3.0",
+    "reflect-metadata": ">= 0.1.12"
   },
   "devDependencies": {
-    "@nestjs/common": "^9.0.7",
-    "@nestjs/core": "^9.0.7",
-    "@nestjs/testing": "^9.0.7",
-    "@nestjs/typeorm": "^9.0.0",
-    "@types/jest": "^28.1.6",
-    "@types/semver": "^7.5.0",
-    "@typescript-eslint/eslint-plugin": "^5.31.0",
-    "@typescript-eslint/parser": "^5.31.0",
-    "eslint": "^8.20.0",
-    "eslint-config-prettier": "^8.5.0",
+    "@faker-js/faker": "^8.2.0",
+    "@nestjs/common": "^9.4.3",
+    "@nestjs/core": "^9.4.3",
+    "@nestjs/platform-express": "^9.4.3",
+    "@nestjs/testing": "^9.4.3",
+    "@nestjs/typeorm": "^10.0.0",
+    "@types/jest": "^28.1.8",
+    "@types/node": "^16.18.61",
+    "@types/supertest": "^2.0.16",
+    "@typescript-eslint/eslint-plugin": "~5.62.0",
+    "@typescript-eslint/parser": "~5.62.0",
+    "eslint": "8.53.0",
+    "eslint-config-prettier": "^8.10.0",
     "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-unused-imports": "^2.0.0",
     "jest": "^28.1.3",
-    "pg": "^8.7.3",
-    "prettier": "^2.7.1",
+    "mysql": "^2.18.1",
+    "pg": "^8.11.3",
+    "prettier": "^2.8.8",
     "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.5.6",
-    "ts-jest": "^28.0.7",
-    "typeorm": "^0.3.10",
-    "typescript": "^4.7.4"
-  },
-  "peerDependencies": {
-    "reflect-metadata": ">= 0.1.12",
-    "typeorm": ">= 0.2.8"
-  },
-  "engines": {
-    "node": ">=12.0.0"
+    "rxjs": "^7.8.1",
+    "ts-jest": "^28.0.8",
+    "ts-node": "^10.9.1",
+    "typeorm": "^0.3.17",
+    "typeorm-extension": "^3.1.1",
+    "typescript": "~4.9.5"
   }
 }
