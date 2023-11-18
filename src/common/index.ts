@@ -3,7 +3,6 @@ import { TypeOrmUpdatedPatchError } from '../errors/typeorm-updated-patch';
 import { storage } from '../storage';
 import { isDataSource } from '../utils';
 import { TYPEORM_ENTITY_MANAGER_NAME, DEFAULT_DATA_SOURCE_NAME } from './constants';
-
 export * from './constants';
 
 interface AddTransactionalDataSourceInput {

@@ -4,6 +4,11 @@ import { PropagationType, Propagation, IsolationLevelType, IsolationLevel } from
 import { TransactionOptions } from '../interfaces';
 import { storage, Store } from '../storage';
 
+const isTransactionActive = (store?: Store<unknown | undefined>): store is Store<QueryRunner> =>
+  store !== undefined &&
+  store.data !== undefined &&
+  (store.data as QueryRunner).isTransactionActive;
+
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
   options?: TransactionOptions,
@@ -22,7 +27,9 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
 
     switch (propagation) {
       case Propagation.REQUIRED:
-        if (!store) {
+        if (isTransactionActive(store)) {
+          return storage.run(store, () => runOriginal());
+        } else {
           const queryRunner = getDataSource(dataSourceName).createQueryRunner();
           const newStore: Store<QueryRunner> = {
             seqId: Date.now().toString(),
@@ -43,11 +50,9 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               await queryRunner.release();
             }
           });
-        } else {
-          return storage.run(store, () => runOriginal());
         }
       case Propagation.SUPPORTS:
-        if (store) {
+        if (isTransactionActive(store)) {
           return storage.run(store, () => runOriginal());
         } else {
           return runOriginal();
