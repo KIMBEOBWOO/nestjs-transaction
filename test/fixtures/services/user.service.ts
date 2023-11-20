@@ -24,7 +24,7 @@ export class UserService {
       .into(User)
       .values({
         ...user,
-        imageList: [new UserImage()],
+        imageList: [UserImage.create()],
       })
       .execute();
   }

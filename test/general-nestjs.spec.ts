@@ -3,13 +3,15 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, QueryRunner } from 'typeorm';
 import { IsolationLevel, runInTransaction } from '../src';
+import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
 import { storage } from '../src/storage';
-import { AppModule, RollbackError, User, UserImage } from './fixtures';
+import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from './fixtures';
 import { getCurrentTransactionId, sleep } from './util';
 
-describe('@Transactional in Nest.js', () => {
+describe('Single Database @Transactional in Nest.js', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+  let dataSourceSub: DataSource;
 
   const fixureUserId = '27ff4cfc-7656-428c-8da4-918424925c38';
 
@@ -19,18 +21,23 @@ describe('@Transactional in Nest.js', () => {
     }).compile();
 
     app = module.createNestApplication();
+
+    await app.init();
+
     dataSource = module.get(getDataSourceToken());
-    app.init();
+    dataSourceSub = module.get(getDataSourceToken(LOG_DB_NAME));
   });
 
   afterAll(async () => {
     await dataSource.destroy();
+    await dataSourceSub.destroy();
     await app.close();
   });
 
   beforeEach(async () => {
-    await dataSource.query('TRUNCATE public.user CASCADE');
-    await dataSource.query('TRUNCATE public.counters CASCADE');
+    await dataSource.query('TRUNCATE public.user RESTART IDENTITY CASCADE');
+    await dataSource.query('TRUNCATE public.counters RESTART IDENTITY CASCADE');
+    await dataSourceSub.query('TRUNCATE public.log RESTART IDENTITY CASCADE');
   });
 
   /**
@@ -70,7 +77,9 @@ describe('@Transactional in Nest.js', () => {
       async ({ source }) => {
         await runInTransaction(async () => {
           const target = source();
-          const storeManager = (storage.getStore()?.data as QueryRunner)?.manager;
+          const storeManager = (
+            storage.getContext(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.data as QueryRunner
+          )?.manager;
 
           expect(target).toBeTruthy();
           expect(storeManager).toBeTruthy();

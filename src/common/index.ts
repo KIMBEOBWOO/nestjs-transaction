@@ -1,8 +1,12 @@
 import { DataSource, EntityManager, QueryRunner, Repository } from 'typeorm';
-import { TypeOrmUpdatedPatchError } from '../errors/typeorm-updated-patch';
+import { TypeOrmUpdatedPatchError } from '../errors';
 import { storage } from '../storage';
 import { isDataSource } from '../utils';
-import { TYPEORM_ENTITY_MANAGER_NAME, DEFAULT_DATA_SOURCE_NAME } from './constants';
+import {
+  TYPEORM_ENTITY_MANAGER_NAME,
+  TYPEORM_DEFAULT_DATA_SOURCE_NAME,
+  TYPEORM_DATA_SOURCE_NAME,
+} from './constants';
 export * from './constants';
 
 interface AddTransactionalDataSourceInput {
@@ -14,7 +18,7 @@ interface AddTransactionalDataSourceInput {
   dataSource: DataSource;
 }
 
-export type DataSourceName = typeof DEFAULT_DATA_SOURCE_NAME | string;
+export type DataSourceName = typeof TYPEORM_DEFAULT_DATA_SOURCE_NAME | string;
 export const dataSourceMap = new Map<DataSourceName, DataSource>();
 
 export function getDataSource(key: DataSourceName): DataSource {
@@ -29,10 +33,17 @@ export function getDataSource(key: DataSourceName): DataSource {
   return dataSource;
 }
 
-export function getStoreQueryRunner(onEmptyFail: true): QueryRunner;
-export function getStoreQueryRunner(onEmptyFail?: false): QueryRunner | undefined;
-export function getStoreQueryRunner(onEmptyFail = false): QueryRunner | undefined {
-  const queryRunner = storage.getStore()?.data;
+export function getStoreQueryRunner(dataSourceName: DataSourceName, onEmptyFail: true): QueryRunner;
+export function getStoreQueryRunner(
+  dataSourceName: DataSourceName,
+  onEmptyFail?: false,
+): QueryRunner | undefined;
+export function getStoreQueryRunner(
+  dataSourceName: DataSourceName,
+  onEmptyFail = false,
+): QueryRunner | undefined {
+  const queryRunner: QueryRunner | undefined =
+    storage.getContext<QueryRunner>(dataSourceName)?.data;
 
   if (queryRunner === undefined && onEmptyFail) {
     throw new Error('Query runner is not set in the running context.');
@@ -57,7 +68,10 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
   Object.defineProperty(dataSource, 'manager', {
     configurable: true,
     get() {
-      return getStoreQueryRunner()?.manager || originalManager;
+      return (
+        getStoreQueryRunner(this[TYPEORM_DATA_SOURCE_NAME] as DataSourceName)?.manager ||
+        originalManager
+      );
     },
     set(manager: EntityManager) {
       originalManager = manager;
@@ -71,7 +85,7 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
 
   // {dataSource.query, $.manager.query} execute transaction in context
   dataSource.query = function (...args: unknown[]) {
-    args[2] = args[2] || dataSource.manager?.queryRunner;
+    args[2] = args[2] || this.manager?.queryRunner;
     return originalQuery.apply(this, args);
   };
 
@@ -100,7 +114,11 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
   Object.defineProperty(Repository.prototype, 'manager', {
     configurable: true,
     get() {
-      return getStoreQueryRunner()?.manager || this[TYPEORM_ENTITY_MANAGER_NAME];
+      return (
+        getStoreQueryRunner(
+          this[TYPEORM_ENTITY_MANAGER_NAME].connection[TYPEORM_DATA_SOURCE_NAME] as DataSourceName,
+        )?.manager || this[TYPEORM_ENTITY_MANAGER_NAME]
+      );
     },
     set(manager?: EntityManager) {
       this[TYPEORM_ENTITY_MANAGER_NAME] = manager;
@@ -108,6 +126,10 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
   });
 
   dataSourceMap.set(name, dataSource);
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  dataSource[TYPEORM_DATA_SOURCE_NAME] = name;
+  storage.setContext(name);
 
   return dataSource;
 };

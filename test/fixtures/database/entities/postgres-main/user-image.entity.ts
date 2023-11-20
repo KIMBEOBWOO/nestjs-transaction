@@ -11,4 +11,9 @@ export class UserImage {
     onUpdate: 'CASCADE',
   })
   user: User;
+
+  static create() {
+    const userImage = new UserImage();
+    return userImage;
+  }
 }

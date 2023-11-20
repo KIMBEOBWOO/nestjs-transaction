@@ -31,91 +31,89 @@ describe('@Transactional UseCase in Nest.js', () => {
     await dataSource.query('TRUNCATE public.user CASCADE');
   });
 
-  describe('Single DataBase', () => {
-    describe('Required', () => {
-      it('If there is an ongoing transaction, must participate.', async () => {
-        const service = app.get(UsingCallbackService);
-        const manager = dataSource.createEntityManager();
+  describe('Required', () => {
+    it('If there is an ongoing transaction, must participate.', async () => {
+      const service = app.get(UsingCallbackService);
+      const manager = dataSource.createEntityManager();
 
-        try {
-          await runInTransaction(async () => {
-            await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2);
-            throw new RollbackError('Roll back');
-          });
-        } catch (e) {
-          if (!(e instanceof RollbackError)) throw e;
-        }
-
-        const userFixtures = await manager.find(User);
-        expect(userFixtures).toStrictEqual([]);
-      });
-
-      it('Commit should be done if it is handled normally.', async () => {
-        const service = app.get(UsingCallbackService);
-        const manager = dataSource.createEntityManager();
-
-        await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2);
-
-        const userFixture = await manager.findOneBy(User, {
-          id: fixureUserId,
+      try {
+        await runInTransaction(async () => {
+          await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2);
+          throw new RollbackError('Roll back');
         });
-        expect(userFixture).toBeDefined();
-      });
+      } catch (e) {
+        if (!(e instanceof RollbackError)) throw e;
+      }
 
-      it('If an error occurs, it should be rolled back all', async () => {
-        const service = app.get(UsingCallbackService);
-
-        try {
-          await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2, () => {
-            throw new RollbackError('Roll back!');
-          });
-        } catch (e) {
-          if (!(e instanceof RollbackError)) throw e;
-        }
-
-        const manager = dataSource.createEntityManager();
-
-        const userFixtures = await manager.find(User);
-        expect(userFixtures).toStrictEqual([]);
-      });
+      const userFixtures = await manager.find(User);
+      expect(userFixtures).toStrictEqual([]);
     });
 
-    describe('Support', () => {
-      it('If there is an ongoing transaction, must participate.', async () => {
-        const service = app.get(UsingCallbackService);
-        const manager = dataSource.createEntityManager();
+    it('Commit should be done if it is handled normally.', async () => {
+      const service = app.get(UsingCallbackService);
+      const manager = dataSource.createEntityManager();
 
-        try {
-          await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2, async () => {
-            await service.createAndUpdateUserSupports('42105270-e444-4626-a784-fc0259d9da8f');
-            throw new RollbackError();
-          });
-        } catch (e) {
-          if (!(e instanceof RollbackError)) throw e;
-        }
+      await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2);
 
-        const userFixtures = await manager.find(User);
-        expect(userFixtures).toStrictEqual([]);
+      const userFixture = await manager.findOneBy(User, {
+        id: fixureUserId,
       });
+      expect(userFixture).toBeDefined();
+    });
 
-      it('If there is no transaction in progress, it must be executed without transaction', async () => {
-        const service = app.get(UsingCallbackService);
+    it('If an error occurs, it should be rolled back all', async () => {
+      const service = app.get(UsingCallbackService);
 
-        try {
-          await service.createAndUpdateUserSupports(fixureUserId, () => {
-            throw new RollbackError('Roll back!');
-          });
-        } catch (e) {
-          if (!(e instanceof RollbackError)) throw e;
-        }
-
-        const manager = dataSource.createEntityManager();
-
-        const userFixture = await manager.findOneBy(User, {
-          id: fixureUserId,
+      try {
+        await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2, () => {
+          throw new RollbackError('Roll back!');
         });
-        expect(userFixture).toBeDefined();
+      } catch (e) {
+        if (!(e instanceof RollbackError)) throw e;
+      }
+
+      const manager = dataSource.createEntityManager();
+
+      const userFixtures = await manager.find(User);
+      expect(userFixtures).toStrictEqual([]);
+    });
+  });
+
+  describe('Support', () => {
+    it('If there is an ongoing transaction, must participate.', async () => {
+      const service = app.get(UsingCallbackService);
+      const manager = dataSource.createEntityManager();
+
+      try {
+        await service.createAndUpdateUserRequied(fixureUserId, fixureUserId2, async () => {
+          await service.createAndUpdateUserSupports('42105270-e444-4626-a784-fc0259d9da8f');
+          throw new RollbackError();
+        });
+      } catch (e) {
+        if (!(e instanceof RollbackError)) throw e;
+      }
+
+      const userFixtures = await manager.find(User);
+      expect(userFixtures).toStrictEqual([]);
+    });
+
+    it('If there is no transaction in progress, it must be executed without transaction', async () => {
+      const service = app.get(UsingCallbackService);
+
+      try {
+        await service.createAndUpdateUserSupports(fixureUserId, () => {
+          throw new RollbackError('Roll back!');
+        });
+      } catch (e) {
+        if (!(e instanceof RollbackError)) throw e;
+      }
+
+      const manager = dataSource.createEntityManager();
+
+      const userFixture = await manager.findOneBy(User, {
+        id: fixureUserId,
       });
+      expect(userFixture).toBeDefined();
     });
   });
 });
