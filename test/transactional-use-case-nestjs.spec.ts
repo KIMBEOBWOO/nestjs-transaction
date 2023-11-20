@@ -5,7 +5,7 @@ import { DataSource } from 'typeorm';
 import { runInTransaction } from '../src';
 import { AppModule, RollbackError, User, UsingCallbackService } from './fixtures';
 
-describe('@Transactional', () => {
+describe('@Transactional UseCase in Nest.js', () => {
   let app: INestApplication;
   let dataSource: DataSource;
 
@@ -28,7 +28,7 @@ describe('@Transactional', () => {
   });
 
   beforeEach(async () => {
-    await dataSource.createEntityManager().clear(User);
+    await dataSource.query('TRUNCATE public.user CASCADE');
   });
 
   describe('Single DataBase', () => {

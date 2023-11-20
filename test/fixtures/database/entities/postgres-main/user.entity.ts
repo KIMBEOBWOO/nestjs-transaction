@@ -1,6 +1,7 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { BaseEntity } from '../base.entity';
 import { faker } from '@faker-js/faker';
+import { UserImage } from './user-image.entity';
 
 @Entity('user')
 export class User extends BaseEntity {
@@ -12,6 +13,11 @@ export class User extends BaseEntity {
     length: 255,
   })
   email!: string;
+
+  @OneToMany(() => UserImage, (userImage) => userImage.user, {
+    cascade: true,
+  })
+  imageList: UserImage[];
 
   static create(input?: string | Partial<User>): User {
     const user = new User();

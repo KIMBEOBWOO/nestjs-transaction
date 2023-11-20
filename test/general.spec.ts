@@ -1,6 +1,6 @@
 import { DataSource } from 'typeorm';
 import { addTransactionalDataSource, runInTransaction } from '../src';
-import { Counter, mainDataSourceOpiton, RollbackError, User } from './fixtures';
+import { mainDataSourceOpiton, RollbackError, User } from './fixtures';
 import { getCurrentTransactionId, sleep } from './util';
 
 const dataSource = new DataSource(mainDataSourceOpiton);
@@ -17,8 +17,9 @@ afterAll(async () => {
 
 describe('Transactional', () => {
   beforeEach(async () => {
-    await dataSource.createEntityManager().clear(User);
-    await dataSource.createEntityManager().clear(Counter);
+    jest.restoreAllMocks();
+    await dataSource.query('TRUNCATE public.user CASCADE');
+    await dataSource.query('TRUNCATE public.counters CASCADE');
   });
 
   /**
@@ -36,6 +37,10 @@ describe('Transactional', () => {
     {
       name: 'Entity Manager, @InjectEntityManager',
       source: dataSource.createEntityManager(),
+    },
+    {
+      name: 'Entity Manager, @InjectEntityManager',
+      source: dataSource.manager,
     },
     {
       name: 'Repository Manager, repository.manager',

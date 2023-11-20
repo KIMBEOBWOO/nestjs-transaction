@@ -1,6 +1,6 @@
 {
   "name": "nestjs-transaction",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "description": "A library that extracts and provides only some of the functions of the 'typeorm-transactional' npm module that are needed to operate in the Nestjs + TypeORM environment",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -15,7 +15,7 @@
     "clean": "rm -rf ./dist",
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "test:set-up": "docker-compose -f test/docker-compose.yml up -d --build",
-    "test": "jest --detectOpenHandles",
+    "test": "yarn test:set-up & jest --detectOpenHandles",
     "migration:generate": "bash ./scripts/migration.generate.sh",
     "migration:run": "bash ./scripts/migration.run.sh",
     "migration:revert": "bash ./scripts/migration.revert.sh",

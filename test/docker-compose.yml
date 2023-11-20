@@ -26,10 +26,9 @@ services:
       - ./postgres-2:/var/lib/postgresql/data
 
   # Local Redis container
-  redis:
-    container_name: redis
+  redis-transaction:
+    container_name: redis-transaction
     image: redis:latest
-    hostname: redis-local
     ports:
       - 3309:6379
     # - Double dollars, so that the variable is not expanded by Docker Compose

@@ -1,16 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectDataSource, InjectEntityManager, InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Transactional } from '../../../src';
-import { User } from '../database';
+import { User, UserImage } from '../database';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     readonly userRepository: Repository<User>,
-    @InjectEntityManager()
-    readonly entityManager: EntityManager,
     @InjectDataSource() private readonly dataSoruce: DataSource,
   ) {}
 
@@ -20,7 +18,15 @@ export class UserService {
       id,
     });
 
-    await this.userRepository.createQueryBuilder().insert().into(User).values(user).execute();
+    await this.userRepository
+      .createQueryBuilder()
+      .insert()
+      .into(User)
+      .values({
+        ...user,
+        imageList: [new UserImage()],
+      })
+      .execute();
   }
 
   @Transactional()
