@@ -1,5 +1,5 @@
 import { DataSource, EntityManager, QueryRunner, Repository } from 'typeorm';
-import { TypeOrmUpdatedPatchError } from '../errors';
+import { NoRegistedDataSourceError, TypeOrmUpdatedPatchError } from '../errors';
 import { storage } from '../storage';
 import { isDataSource } from '../utils';
 import {
@@ -19,15 +19,13 @@ interface AddTransactionalDataSourceInput {
 }
 
 export type DataSourceName = typeof TYPEORM_DEFAULT_DATA_SOURCE_NAME | string;
-export const dataSourceMap = new Map<DataSourceName, DataSource>();
+const dataSourceMap = new Map<DataSourceName, DataSource>();
 
 export function getDataSource(key: DataSourceName): DataSource {
   const dataSource = dataSourceMap.get(key);
 
   if (dataSource === undefined) {
-    throw new Error(
-      'There is no registered DataSource. DataSource must be registered through addTransactionalDataSource.',
-    );
+    throw new NoRegistedDataSourceError();
   }
 
   return dataSource;
@@ -51,6 +49,23 @@ export function getStoreQueryRunner(
 
   return queryRunner as QueryRunner;
 }
+
+export const initializeTransactionalContext = () => {
+  // {repository.manager} return context manager if exist
+  Object.defineProperty(Repository.prototype, 'manager', {
+    configurable: true,
+    get() {
+      return (
+        getStoreQueryRunner(
+          this[TYPEORM_ENTITY_MANAGER_NAME].connection[TYPEORM_DATA_SOURCE_NAME] as DataSourceName,
+        )?.manager || this[TYPEORM_ENTITY_MANAGER_NAME]
+      );
+    },
+    set(manager?: EntityManager) {
+      this[TYPEORM_ENTITY_MANAGER_NAME] = manager;
+    },
+  });
+};
 
 export const addTransactionalDataSource = (input: AddTransactionalDataSourceInput | DataSource) => {
   if (isDataSource(input)) {
@@ -109,21 +124,6 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
     // @ts-ignore
     return originalManager.transaction(...args);
   };
-
-  // {repository.manager} return context manager if exist
-  Object.defineProperty(Repository.prototype, 'manager', {
-    configurable: true,
-    get() {
-      return (
-        getStoreQueryRunner(
-          this[TYPEORM_ENTITY_MANAGER_NAME].connection[TYPEORM_DATA_SOURCE_NAME] as DataSourceName,
-        )?.manager || this[TYPEORM_ENTITY_MANAGER_NAME]
-      );
-    },
-    set(manager?: EntityManager) {
-      this[TYPEORM_ENTITY_MANAGER_NAME] = manager;
-    },
-  });
 
   dataSourceMap.set(name, dataSource);
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment

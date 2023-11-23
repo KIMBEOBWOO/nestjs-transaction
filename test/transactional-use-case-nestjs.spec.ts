@@ -18,8 +18,9 @@ describe('@Transactional UseCase in Nest.js', () => {
     }).compile();
 
     app = module.createNestApplication();
-
     dataSource = app.get<DataSource>(getDataSourceToken());
+
+    await app.init();
   });
 
   afterAll(async () => {

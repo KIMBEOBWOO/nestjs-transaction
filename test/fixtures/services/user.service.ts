@@ -13,7 +13,7 @@ export class UserService {
   ) {}
 
   @Transactional()
-  async createUser(id: string) {
+  async createUser(id?: string) {
     const user = User.create({
       id,
     });

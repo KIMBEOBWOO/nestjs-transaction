@@ -41,7 +41,9 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
 
             try {
               const result = await runOriginal();
+
               await queryRunner.commitTransaction();
+
               return result;
             } catch (e) {
               await queryRunner.rollbackTransaction();

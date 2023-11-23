@@ -49,7 +49,8 @@ describe('Single Database @Transactional in Nest.js', () => {
      */
     // {
     //   name: '@InjectEntityManager',
-    //   source: () => app.get<EntityManager>(getEntityManagerToken()),
+    //   // source: async () => await app.resolve<EntityManager>(getTransactionalEntityManagerToken()),
+    //   source: () => app.get(getEntityManagerToken()),
     // },
     {
       name: '@InjectDataSource',
@@ -76,13 +77,14 @@ describe('Single Database @Transactional in Nest.js', () => {
       'Injected providers $name must be return storage queryRunner',
       async ({ source }) => {
         await runInTransaction(async () => {
-          const target = source();
+          const target = await source();
           const storeManager = (
             storage.getContext(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.data as QueryRunner
           )?.manager;
 
           expect(target).toBeTruthy();
           expect(storeManager).toBeTruthy();
+
           expect(target === storeManager).toBe(true);
         });
       },
@@ -92,20 +94,21 @@ describe('Single Database @Transactional in Nest.js', () => {
       'if use $name Save CASCADE should be works',
       async ({ source }) => {
         await runInTransaction(async () => {
+          const manager = await source();
+
           const user = User.create({
             id: fixureUserId,
           });
 
           const userImage = new UserImage();
 
-          await source().save(User, {
+          await manager.save(User, {
             ...user,
             imageList: [userImage],
           });
         });
 
-        const manager = dataSource.createEntityManager();
-        const userFixture = await manager.findOne(User, {
+        const userFixture = await dataSource.manager.findOne(User, {
           where: {
             id: fixureUserId,
           },
@@ -131,8 +134,9 @@ describe('Single Database @Transactional in Nest.js', () => {
         let transactionIdB: number | null = null;
 
         await runInTransaction(async () => {
+          const manager = await source();
           transactionIdA = await getCurrentTransactionId(dataSource);
-          await source().save(User.create());
+          await manager.save(User.create());
         });
 
         await runInTransaction(async () => {
@@ -146,19 +150,21 @@ describe('Single Database @Transactional in Nest.js', () => {
 
       it('If executed in the same context, the query must be executed within the same transaction.', async () => {
         let transactionIdBefore: number | null = null;
+
         await runInTransaction(async () => {
-          transactionIdBefore = await getCurrentTransactionId(source());
-          await source().save(User.create(userFixtureId));
-          const transactionIdAfter = await getCurrentTransactionId(source());
+          const manager = await source();
+          transactionIdBefore = await getCurrentTransactionId(dataSource);
+          await manager.save(User.create(userFixtureId));
+          const transactionIdAfter = await getCurrentTransactionId(dataSource);
 
           expect(transactionIdBefore).toBeTruthy();
           expect(transactionIdBefore).toBe(transactionIdAfter);
         });
 
-        const transactionIdOutside = await getCurrentTransactionId(source());
+        const transactionIdOutside = await getCurrentTransactionId(dataSource);
         expect(transactionIdOutside).not.toBe(transactionIdBefore);
 
-        const user = await source().findOneBy(User, {
+        const user = await dataSource.manager.findOneBy(User, {
           id: userFixtureId,
         });
         expect(user).toBeDefined();
@@ -167,27 +173,27 @@ describe('Single Database @Transactional in Nest.js', () => {
       it('Should rollback the transaction if an error is thrown', async () => {
         try {
           await runInTransaction(async () => {
-            await source().save(User.create(userFixtureId));
+            const manager = await source();
+            await manager.save(User.create(userFixtureId));
             throw new RollbackError();
           });
         } catch (e) {
           if (!(e instanceof RollbackError)) throw e;
         }
 
-        const user = await source().findOneBy(User, {
+        const user = await dataSource.manager.findOneBy(User, {
           id: userFixtureId,
         });
         expect(user).toBe(null);
       });
 
       it('If the context is nested, all subcontexts must participate in the transaction in which the top-level context is in progress.', async () => {
-        const manager = source();
-
         await runInTransaction(async () => {
-          const transactionIdBefore = await getCurrentTransactionId(manager);
+          const manager = await source();
+          const transactionIdBefore = await getCurrentTransactionId(dataSource);
 
           await runInTransaction(async () => {
-            const transactionIdAfter = await getCurrentTransactionId(manager);
+            const transactionIdAfter = await getCurrentTransactionId(dataSource);
 
             await manager.save(User.create(userFixtureId));
             expect(transactionIdBefore).toBe(transactionIdAfter);
@@ -195,31 +201,32 @@ describe('Single Database @Transactional in Nest.js', () => {
         });
 
         expect.assertions(2);
-        const user = await manager.findOneBy(User, {
+        const user = await dataSource.manager.findOneBy(User, {
           id: userFixtureId,
         });
         expect(user).toBeDefined();
       });
 
       it('When different contacts run in parallel, they must operate in different transactions.', async () => {
-        const manager = source();
-
         let transactionA: number | null = null;
         let transactionB: number | null = null;
         let transactionC: number | null = null;
 
         await Promise.all([
           runInTransaction(async () => {
+            const manager = await source();
             await manager.save(User.create());
-            transactionA = await getCurrentTransactionId(manager);
+            transactionA = await getCurrentTransactionId(dataSource);
           }),
           runInTransaction(async () => {
+            const manager = await source();
             await manager.save(User.create());
-            transactionB = await getCurrentTransactionId(manager);
+            transactionB = await getCurrentTransactionId(dataSource);
           }),
           runInTransaction(async () => {
+            const manager = await source();
             await manager.save(User.create());
-            transactionC = await getCurrentTransactionId(manager);
+            transactionC = await getCurrentTransactionId(dataSource);
           }),
         ]);
 
@@ -233,15 +240,13 @@ describe('Single Database @Transactional in Nest.js', () => {
         expect(transactionA).not.toBe(transactionC);
         expect(transactionB).not.toBe(transactionC);
 
-        const users = await manager.find(User, {});
+        const users = await dataSource.manager.find(User, {});
         expect(users.length).toBe(3);
       });
 
       it("doesn't leak variables to outer scope", async () => {
         let transactionSetup = false;
         let transactionEnded = false;
-
-        const manager = source();
 
         let transactionIdOutside: number | null = null;
 
@@ -250,7 +255,7 @@ describe('Single Database @Transactional in Nest.js', () => {
 
           await sleep(500);
 
-          const transactionIdInside = await getCurrentTransactionId(manager);
+          const transactionIdInside = await getCurrentTransactionId(dataSource);
 
           expect(transactionIdInside).toBeTruthy();
           expect(transactionIdOutside).toBe(null);
@@ -270,7 +275,7 @@ describe('Single Database @Transactional in Nest.js', () => {
         });
 
         expect(transactionEnded).toBe(false);
-        transactionIdOutside = await getCurrentTransactionId(manager);
+        transactionIdOutside = await getCurrentTransactionId(dataSource);
         expect(transactionIdOutside).toBe(null);
 
         expect(transactionEnded).toBe(false);
@@ -280,10 +285,9 @@ describe('Single Database @Transactional in Nest.js', () => {
 
       describe('Isolation', () => {
         it('should read the most recent committed rows when using READ COMMITTED isolation level', async () => {
-          const manager = source();
-
           await runInTransaction(
             async () => {
+              const manager = await source();
               const totalUsers = await manager.count(User);
               expect(totalUsers).toBe(0);
 
@@ -299,10 +303,9 @@ describe('Single Database @Transactional in Nest.js', () => {
         });
 
         it("shouldn't see the most recent committed rows when using REPEATABLE READ isolation level", async () => {
-          const manager = source();
-
           await runInTransaction(
             async () => {
+              const manager = await source();
               const notExistUser = await manager.findOneBy(User, {
                 id: userFixtureId,
               });

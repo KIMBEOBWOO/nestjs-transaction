@@ -18,6 +18,10 @@ export class ContextStorage implements Storage {
     this._storageMap = new Map();
   }
 
+  get storageMap() {
+    return this._storageMap;
+  }
+
   setContext(key: string) {
     this._storageMap.set(key, new AsyncLocalStorage());
   }
