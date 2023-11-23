@@ -1,13 +1,17 @@
 import {
+  ClassProvider,
   DynamicModule,
+  FactoryProvider,
   Inject,
   Module,
   OnModuleInit,
   Optional,
+  Type,
   ValueProvider,
 } from '@nestjs/common';
 import { DiscoveryModule, DiscoveryService } from '@nestjs/core';
 import { InstanceWrapper } from '@nestjs/core/injector/instance-wrapper';
+import { AopModule } from '@toss/nestjs-aop';
 import { DataSource } from 'typeorm';
 import {
   addTransactionalDataSource,
@@ -17,13 +21,16 @@ import {
 } from '../common';
 import { NoRegistedDataSourceError } from '../errors';
 import { TransactionModuleOption } from '../interfaces';
+import { ALSTransactionAspect } from '../providers';
+import { TypeORMTransactionService } from '../providers/typeorm-transaction.service';
+import { TYPEORM_TRANSACTION_SERVICE_TOKEN } from '../symbols';
 
 @Module({
-  imports: [DiscoveryModule],
+  imports: [AopModule, DiscoveryModule],
 })
 export class TransactionModule implements OnModuleInit {
   constructor(
-    private readonly discoveryService: DiscoveryService,
+    protected readonly discoveryService: DiscoveryService,
     @Optional()
     @Inject(TRANSACTION_MODULE_OPTION_TOKEN)
     private readonly transactionModuleOption?: TransactionModuleOption,
@@ -49,13 +56,40 @@ export class TransactionModule implements OnModuleInit {
   }
 
   static forRoot(option?: TransactionModuleOption): DynamicModule {
-    const transactionModuleOptionProviders = this.getTransacionModuleOptionProviders(option);
+    const moduleOptionProviders = this.getTransacionModuleOptionProviders(option);
+    const serviceProviders = this.getServiceProividers();
 
     return {
       module: TransactionModule,
-      providers: [...transactionModuleOptionProviders],
-      exports: [...transactionModuleOptionProviders.map((provider) => provider.provide)],
+      providers: [...moduleOptionProviders, ...serviceProviders],
+      exports: [
+        ...moduleOptionProviders.map((provider) => provider.provide),
+        ...serviceProviders.map((provider) =>
+          'provide' in provider ? provider.provide : provider,
+        ),
+      ],
     };
+  }
+
+  /**
+   * Register the Aspect provider used by the transaction module
+   * @param option optional, Transaction Module option
+   * @returns ValueProvider[]
+   */
+  protected static getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
+    return [
+      ALSTransactionAspect,
+      // {
+      //   provide: TYPEORM_TRANSACTION_SERVICE_TOKEN,
+      //   useClass: TypeORMTransactionService,
+      // },
+      {
+        provide: TYPEORM_TRANSACTION_SERVICE_TOKEN,
+        useFactory: () => {
+          return TypeORMTransactionService.getInstance();
+        },
+      },
+    ];
   }
 
   /**
@@ -63,7 +97,7 @@ export class TransactionModule implements OnModuleInit {
    * @param option optional, Transaction Module option
    * @returns ValueProvider[]
    */
-  private static getTransacionModuleOptionProviders(
+  protected static getTransacionModuleOptionProviders(
     option?: TransactionModuleOption,
   ): ValueProvider[] {
     return [
@@ -74,7 +108,7 @@ export class TransactionModule implements OnModuleInit {
     ];
   }
 
-  private isDataSourceInstanceWrapper = (
+  protected isDataSourceInstanceWrapper = (
     value: InstanceWrapper<any>,
   ): value is InstanceWrapper<DataSource> => {
     const isDataSourceInstance = (value: unknown): value is DataSource =>

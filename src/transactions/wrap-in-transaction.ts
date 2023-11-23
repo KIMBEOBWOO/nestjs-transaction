@@ -1,61 +1,30 @@
-import { QueryRunner } from 'typeorm';
-import { TYPEORM_DEFAULT_DATA_SOURCE_NAME, getDataSource } from '../common';
-import { PropagationType, Propagation, IsolationLevelType, IsolationLevel } from '../enums';
-import { TransactionOptions } from '../interfaces';
-import { storage, Store } from '../storage';
-
-const isTransactionActive = (store?: Store<unknown | undefined>): store is Store<QueryRunner> =>
-  store !== undefined &&
-  store.data !== undefined &&
-  (store.data as QueryRunner)?.isTransactionActive;
+import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
+import { PropagationType, Propagation } from '../enums';
+import { TransactionOptions, ExecutableTransaction } from '../interfaces';
+import { storage } from '../storage';
 
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
+  executableTransaction: ExecutableTransaction,
   options?: TransactionOptions,
 ) => {
   function wrapper(this: unknown, ...args: unknown[]) {
-    const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-
     const propagation: PropagationType = options?.propagation || Propagation.REQUIRED;
-
-    const isolationLevel: IsolationLevelType =
-      options?.isolationLevel || IsolationLevel.READ_COMMITTED;
-
-    const store = storage.getContext(dataSourceName);
-
     const runOriginal = () => fn.apply(this, args);
+
+    const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
+    const store = storage.getContext(dataSourceName);
 
     switch (propagation) {
       case Propagation.REQUIRED:
-        if (isTransactionActive(store)) {
-          return storage.run(dataSourceName, store, () => runOriginal());
+        if (executableTransaction.isActive(store)) {
+          return executableTransaction.joinInCurrentTransaction(runOriginal, options);
         } else {
-          const queryRunner = getDataSource(dataSourceName).createQueryRunner();
-
-          const newStore: Store<QueryRunner> = {
-            data: queryRunner,
-          };
-
-          return storage.run(dataSourceName, newStore, async () => {
-            await queryRunner.startTransaction(isolationLevel);
-
-            try {
-              const result = await runOriginal();
-
-              await queryRunner.commitTransaction();
-
-              return result;
-            } catch (e) {
-              await queryRunner.rollbackTransaction();
-              throw e;
-            } finally {
-              await queryRunner.release();
-            }
-          });
+          return executableTransaction.runInNewTransaction(runOriginal, options);
         }
       case Propagation.SUPPORTS:
-        if (isTransactionActive(store)) {
-          return storage.run(dataSourceName, store, () => runOriginal());
+        if (executableTransaction.isActive(store)) {
+          return executableTransaction.joinInCurrentTransaction(runOriginal, options);
         } else {
           return runOriginal();
         }

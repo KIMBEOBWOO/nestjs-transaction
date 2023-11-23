@@ -31,3 +31,9 @@ export interface TransactionModuleOption {
    */
   dataSourceNames?: DataSourceName[];
 }
+
+export interface ExecutableTransaction {
+  isActive(...param: unknown[]): boolean;
+  joinInCurrentTransaction(...param: unknown[]): unknown;
+  runInNewTransaction(...param: unknown[]): unknown;
+}

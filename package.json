@@ -40,6 +40,9 @@
     "email": "qjqdn1568@naver.com"
   },
   "license": "MIT",
+  "dependencies": {
+    "@toss/nestjs-aop": "^2.1.2"
+  },
   "peerDependencies": {
     "@nestjs/common": "^8 || ^9 || ^10",
     "@nestjs/core": "^8 || ^9 || ^10",
@@ -47,18 +50,18 @@
     "typeorm": ">= 0.3.0"
   },
   "devDependencies": {
-    "@faker-js/faker": "^8.2.0",
-    "@nestjs/common": "^9.4.3",
-    "@nestjs/core": "^9.4.3",
-    "@nestjs/platform-express": "^9.4.3",
-    "@nestjs/testing": "^9.4.3",
-    "@nestjs/typeorm": "^10.0.0",
+    "@faker-js/faker": "^8.3.1",
+    "@nestjs/common": "^8.4.7",
+    "@nestjs/core": "^8.4.7",
+    "@nestjs/platform-express": "^8.4.7",
+    "@nestjs/testing": "^8.4.7",
+    "@nestjs/typeorm": "^10.0.1",
     "@types/jest": "^28.1.8",
-    "@types/node": "^16.18.61",
+    "@types/node": "^16.18.64",
     "@types/supertest": "^2.0.16",
     "@typescript-eslint/eslint-plugin": "~5.62.0",
     "@typescript-eslint/parser": "~5.62.0",
-    "eslint": "8.53.0",
+    "eslint": "8.54.0",
     "eslint-config-prettier": "^8.10.0",
     "eslint-plugin-prettier": "^4.2.1",
     "eslint-plugin-unused-imports": "^2.0.0",

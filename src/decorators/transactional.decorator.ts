@@ -1,27 +1,11 @@
 import { TransactionOptions } from '../interfaces';
-import { wrapInTransaction } from '../transactions';
+import { createDecorator } from '@toss/nestjs-aop';
+import { TRANSACTION_DECORATOR } from '../symbols';
 
-export const Transactional = (options?: TransactionOptions): MethodDecorator => {
-  return (
-    _: unknown,
-    methodName: string | symbol,
-    descriptor: TypedPropertyDescriptor<unknown>,
-  ) => {
-    const originalMethod = descriptor.value as () => unknown;
-
-    descriptor.value = wrapInTransaction(originalMethod, {
-      ...options,
-    });
-
-    Reflect.getMetadataKeys(originalMethod).forEach((previousMetadataKey) => {
-      const previousMetadata = Reflect.getMetadata(previousMetadataKey, originalMethod);
-
-      Reflect.defineMetadata(previousMetadataKey, previousMetadata, descriptor.value as object);
-    });
-
-    Object.defineProperty(descriptor.value, 'name', {
-      value: originalMethod.name,
-      writable: false,
-    });
-  };
-};
+/**
+ * Transaction Decorator (for Method)
+ * @param options Set options for transaction propagation and isolation levels
+ * @returns MethodDecorator
+ */
+export const Transactional = (options?: TransactionOptions) =>
+  createDecorator(TRANSACTION_DECORATOR, options);

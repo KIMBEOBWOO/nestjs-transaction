@@ -197,10 +197,17 @@ describe('Single Database @Transactional in Nest.js', () => {
 
             await manager.save(User.create(userFixtureId));
             expect(transactionIdBefore).toBe(transactionIdAfter);
+
+            await runInTransaction(async () => {
+              const transactionIdAfter = await getCurrentTransactionId(dataSource);
+
+              await manager.save(User.create(userFixtureId));
+              expect(transactionIdBefore).toBe(transactionIdAfter);
+            });
           });
         });
 
-        expect.assertions(2);
+        expect.assertions(3);
         const user = await dataSource.manager.findOneBy(User, {
           id: userFixtureId,
         });
