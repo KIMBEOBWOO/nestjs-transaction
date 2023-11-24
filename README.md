@@ -6,24 +6,28 @@
 
 A `Transactional` Method Decorator for [typeorm](http://typeorm.io/) that uses [ALS](https://nodejs.org/api/async_context.html#class-asynclocalstorage) to handle and propagate transactions between different repositories and service methods.
 
+To facilitate the use of [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional) in Nest.js, several features have been added, including the `TransactionModule`, and the [@toss/nestjsaop](https://www.npmjs.com/package/@toss/nestjs-aop) library is being used to provide transaction capabilities that can be customized based on injectable providers in future services.
+
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
 
-- [Typeorm Transactional](#typeorm-transactional)
+- [Nestjs Transactional](#nestjs-transactional)
   - [It's a fork of typeorm-transactional for Nestjs customization](#its-a-fork-of-typeorm-transactionalhttpsgithubcomaliheymtypeorm-transactional-for-nestjs-customization)
   - [Installation](#installation)
   - [Usage](#usage)
   - [Using Transactional Decorator](#using-transactional-decorator)
   - [Data Sources](#data-sources)
+    - [Multiple DataSources](#multiple-datasources)
+    - [Select the name of the data source to participate](#select-the-name-of-the-data-source-to-participate)
   - [Transaction Propagation](#transaction-propagation)
   - [Isolation Levels](#isolation-levels)
-  - [Unit Test Mocking](#unit-test-mocking)
+  - [Test Mocking](#test-mocking)
+    - [Unit Test](#unit-test)
+    - [Integration Test](#integration-test)
   - [API](#api)
     - [Transaction Options](#transaction-options)
     - [addTransactionalDataSource(input): DataSource](#addtransactionaldatasourceinput-datasource)
-    - [runInTransaction(fn: Callback, options?: Options): Promise<...>](#runintransactionfn-callback-options-options-promise)
-    - [wrapInTransaction(fn: Callback, options?: Options): WrappedFunction](#wrapintransactionfn-callback-options-options-wrappedfunction)
 
 <!-- /code_chunk_output -->
 
@@ -33,7 +37,7 @@ A `Transactional` Method Decorator for [typeorm](http://typeorm.io/) that uses [
 
 ```shell
 ## npm
-npm install --save nestjs-transactional
+npm install --save nestjs-transaction
 
 ## Needed dependencies
 npm install --save typeorm reflect-metadata
@@ -42,7 +46,7 @@ npm install --save typeorm reflect-metadata
 Or
 
 ```shell
-yarn add nestjs-transactional
+yarn add nestjs-transaction
 
 ## Needed dependencies
 yarn add typeorm reflect-metadata
@@ -50,64 +54,33 @@ yarn add typeorm reflect-metadata
 
 > **Note**: You will need to import `reflect-metadata` somewhere in the global place of your app - https://github.com/typeorm/typeorm#installation
 
-**IMPORTANT NOTE**
-
-Calling [initializeTransactionalContext](#initialization) must happen BEFORE any application context is initialized!
-
----
+<br/>
 
 ## Usage
 
 New versions of TypeORM use `DataSource` instead of `Connection`, so most of the API has been changed and the old API has become deprecated.
 
-To be able to use TypeORM entities in transactions, you must first add a DataSource using the `addTransactionalDataSource` function:
+Register `TransactionModule` with `AppModule`. Once the module is registered, it automatically finds all TypeORM DataSources that exist and adds them to the Transactional DataSource so that `@Transactional` can be used.
 
 Example for `Nest.js`:
 
 ```typescript
 // app.module.ts
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { addTransactionalDataSource } from 'nestjs-transactional;
-import { mainDataSourceOpiton, subDataSourceOption } from './data-sources';
+import { TransactionModule } from 'nestjs-transactional;
 
 @Module({
   imports: [
-    // Postgres Database
-    TypeOrmModule.forRootAsync({
-      useFactory: () => mainDataSourceOpiton,
-      // dataSource receives the configured DataSourceOptions
-      // and returns a Promise<DataSource>.
-      dataSourceFactory: async (options) => {
-        if (!options) {
-          throw new Error('Invalild DataSource options');
-        }
-
-        return addTransactionalDataSource(new DataSource(options));
-      },
-    }),
-    // Postgres Database 2
-    TypeOrmModule.forRootAsync({
-      name: LOG_DB_NAME,
-      useFactory: () => subDataSourceOption,
-      dataSourceFactory: async (options) => {
-        if (!options) {
-          throw new Error('Invalild DataSource options');
-        }
-
-        return addTransactionalDataSource(new DataSource(options));
-      },
-    }),
+    TransactionModule.forRoot()
   ],
-  providers: [],
 })
-export class DatabaseModule {}
+export class AppModule {}
 ```
 
 Unlike `typeorm-transactional-cls-hooked`, you do not need to use `BaseRepository`or otherwise define repositories.
 
-**NOTE**: You can [add](#data-sources) multiple `DataSource` if you need it
+**NOTE** You can [select](#select-the-name-of-the-data-source-to-participate) specific `DataSource` if you need it
 
 <br/>
 
@@ -151,13 +124,40 @@ export class PostService {
 
 ## Data Sources
 
-In new versions of `TypeORM` the `name` property in `Connection` / `DataSource` is deprecated, so to work conveniently with multiple `DataSource` the function `addTransactionalDataSource` allows you to specify custom the name:
+### Multiple DataSources
+
+In new versions of `TypeORM` the `name` property in `Connection` / `DataSource` is deprecated, so to work conveniently with multiple `DataSource` the function `addTransactionalDataSource` allows you to specify custom the name.
 
 ```typescript
-addTransactionalDataSource({
-	name: 'second-data-source',
-	dataSource: new DataSource(...)
-});
+@Module({
+  imports: [
+    TransactionModule.forRoot(),
+
+    // Postgres Database
+    TypeOrmModule.forRootAsync({
+      useFactory: () => ({
+        type: 'postgres',
+        host: '127.0.0.1',
+        port: 5435,
+        username: 'beobwoo',
+        password: 'testtest',
+        database: 'test_db',
+      }),
+    }),
+    // Postgres Database 2
+    TypeOrmModule.forRoot({
+      name: 'second-data-source',
+      type: 'postgres',
+      host: '127.0.0.1',
+      port: 5436,
+      username: 'beobwoo',
+      password: 'testtest',
+      database: 'test_db_2',
+    }),
+  ],
+  providers: [],
+})
+export class AppModule {}
 ```
 
 If you don't specify a name, it defaults to `default`.
@@ -178,6 +178,20 @@ runInTransaction(
   },
   { connectionName: 'second-data-source' },
 );
+```
+
+> **Note**: If you use `TypeORM.forRootAsync` when Nest.js uses DataSourceName, you must also enter the name attribute in the body. - [Nestjs Docs](https://docs.nestjs.com/techniques/database)
+
+<br/>
+
+### Select the name of the data source to participate
+
+If you register using the forRoot method, you need the ability to **select** from `multiple DataSources`. If used without additional options, register all `DataSources` automatically.
+
+```typescript
+TransactionModule.forRoot({
+  dataSourceNames: ['default'], // if you want regist Default DataSource only (no name TypeORM dataSource)
+}),
 ```
 
 <br/>
@@ -202,19 +216,67 @@ The following isolation level options can be specified:
 
 <br/>
 
-## Unit Test Mocking
+## Test Mocking
+
+### Unit Test
 
 `@Transactional` can be mocked to prevent running any of the transactional code in unit tests.
 
 This can be accomplished in Jest with:
 
 ```typescript
-jest.mock('typeorm-transactional', () => ({
+jest.mock('nestjs-transactional', () => ({
   Transactional: () => () => ({}),
 }));
 ```
 
 Repositories, services, etc. can be mocked as usual.
+
+<br/>
+
+### Integration Test
+
+```tsx
+import { getTestQueryRunnerToken, TestTransactionModule } from 'nestjs-transaction';
+
+beforeAll(async () => {
+  const module = await Test.createTestingModule({
+    imports: [
+      AppModule,
+      TestTransactionModule.forRoot(), // <-- if regist TestTransactionModule, you can use testQueryRunner
+    ],
+  }).compile();
+
+  app = module.createNestApplication();
+  await app.init(); // NOTE : TransactionModule using lifecycle hooks
+  dataSource = app.get<DataSource>(getDataSourceToken());
+
+  // A QueryRunner used by @Transactional applied methods
+  // while participating in a transaction to execute a query
+  testQueryRunner = app.get<QueryRunner>(getTestQueryRunnerToken());
+});
+
+beforeEach(async () => {
+  await testQueryRunner.startTransaction();
+});
+
+afterEach(async () => {
+  await testQueryRunner.rollbackTransaction();
+});
+
+it('it should be return ResponseDTO Array in body', async () => {
+  const response = await request(app.getHttpServer())
+    .patch(`/v1/<<url>>`)
+    .send(dto)
+    .expect(HttpStatus.OK);
+
+  expect(response.body).toStrictEqual([]);
+});
+```
+
+When using the above method in integrated tests using `jest`, each test result is automatically **rolled back**, eliminating the need to clean the table data after each test. This requires additional recall of `TestTransactionModule`, as opposed to registering only `AppModule` in general.
+
+`TestQueryRunner` is not available unless you have registered a `TestTransactionModule`. It is of course possible to manually clean the test data without registering the `TestTransactionModule`.
 
 <br/>
 
@@ -234,52 +296,15 @@ Repositories, services, etc. can be mocked as usual.
 - `isolationLevel`- isolation level for transactional context ([isolation levels](#isolation-levels) )
 - `propagation`- propagation behaviors for nest transactional contexts ([propagation behaviors](#transaction-propagation))
 
+<br/>
+
 ### addTransactionalDataSource(input): DataSource
 
 Add TypeORM `DataSource` to transactional context.
 
 ```typescript
 addTransactionalDataSource(new DataSource(...));
-
-addTransactionalDataSource({ name: 'default', dataSource: new DataSource(...), patch: true });
+addTransactionalDataSource({ name: 'default', : new DataSource(...) });
 ```
 
-### runInTransaction(fn: Callback, options?: Options): Promise<...>
-
-Run code in transactional context.
-
-```typescript
-...
-
-runInTransaction(() => {
-	...
-
-	const user = this.usersRepo.update({ id: 1000 }, { state: action });
-
-	...
-}, { propagation: Propagation.REQUIRES_NEW });
-
-...
-```
-
-### wrapInTransaction(fn: Callback, options?: Options): WrappedFunction
-
-Wrap function in transactional context
-
-```typescript
-...
-
-const updateUser = wrapInTransaction(() => {
-	...
-
-	const user = this.usersRepo.update({ id: 1000 }, { state: action });
-
-	...
-}, { propagation: Propagation.NEVER });
-
-...
-
-await updateUser();
-
-
-```
+<br/>
