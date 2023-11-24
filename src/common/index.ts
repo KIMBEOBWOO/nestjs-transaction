@@ -8,6 +8,7 @@ import {
   TYPEORM_DATA_SOURCE_NAME,
 } from './constants';
 export * from './constants';
+export * from './symbol';
 
 interface AddTransactionalDataSourceInput {
   /**

@@ -19,7 +19,10 @@ export class TypeORMTransactionService implements ExecutableTransaction {
     return TypeORMTransactionService.instance;
   }
 
-  isActive(store: Store): boolean {
+  isActive(options?: TransactionOptions): boolean {
+    const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
+    const store = storage.getContext(dataSourceName);
+
     return (
       store !== undefined &&
       store.data !== undefined &&

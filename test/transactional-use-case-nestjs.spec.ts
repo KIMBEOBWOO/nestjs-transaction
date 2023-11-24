@@ -2,14 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource, QueryRunner } from 'typeorm';
-import { IsolationLevel, IsolationLevelType, runInTransaction } from '../src';
-import { AppModule, RollbackError, User, UserService, UsingCallbackService } from './fixtures';
-import * as common from '../src/common';
-import { TEST_QUERY_RUNNER_TOKEN, TYPEORM_TRANSACTION_SERVICE_TOKEN } from '../src/symbols';
-import { MockTransactionModule } from '../src/mocks';
-import { Store, storage } from '../src/storage';
-import { ExecutableTransaction, TransactionOptions } from '../src/interfaces';
-import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
+import { getTestQueryRunnerToken, runInTransaction, TestTransactionModule } from '../src';
+import { AppModule, RollbackError, User, UsingCallbackService } from './fixtures';
 
 describe('@Transactional UseCase in Nest.js', () => {
   let app: INestApplication;
@@ -21,75 +15,31 @@ describe('@Transactional UseCase in Nest.js', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      imports: [AppModule, MockTransactionModule.forRoot()],
+      imports: [AppModule, TestTransactionModule.forRoot()],
     }).compile();
 
     app = module.createNestApplication();
     await app.init();
 
     dataSource = app.get<DataSource>(getDataSourceToken());
-    testQueryRunner = app.get<QueryRunner>(TEST_QUERY_RUNNER_TOKEN);
+    testQueryRunner = app.get<QueryRunner>(getTestQueryRunnerToken());
   });
 
   afterAll(async () => {
-    // await testQueryRunner.release();
+    await testQueryRunner.release();
     await dataSource.destroy();
     await app.close();
   });
 
-  beforeEach(async () => {
-    await dataSource.query('TRUNCATE public.user CASCADE');
-    await testQueryRunner.startTransaction();
-  });
-
-  afterEach(async () => {
-    await testQueryRunner.rollbackTransaction();
-  });
-
-  it('', async () => {
-    // 각 storage 에 미리 엔터티 적용
-    jest.spyOn(common, 'getDataSource').mockImplementation(() => {
-      return {
-        createQueryRunner: () => testQueryRunner,
-      } as any;
+  describe('Required', () => {
+    beforeEach(async () => {
+      await testQueryRunner.startTransaction();
     });
 
-    const transactionService = app.get<ExecutableTransaction>(TYPEORM_TRANSACTION_SERVICE_TOKEN);
+    afterEach(async () => {
+      await testQueryRunner.rollbackTransaction();
+    });
 
-    jest
-      .spyOn(transactionService, 'runInNewTransaction')
-      .mockImplementation((runOriginal: () => any, options?: TransactionOptions) => {
-        const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-        const isolationLevel: IsolationLevelType =
-          options?.isolationLevel || IsolationLevel.READ_COMMITTED;
-
-        const queryRunner = common.getDataSource(dataSourceName).createQueryRunner();
-
-        const newStore: Store<QueryRunner> = {
-          data: queryRunner,
-        };
-
-        return storage.run(dataSourceName, newStore, async () => {
-          await queryRunner.startTransaction(isolationLevel);
-
-          try {
-            const result = await runOriginal();
-
-            await queryRunner.commitTransaction();
-
-            return result;
-          } catch (e) {
-            await queryRunner.rollbackTransaction();
-            throw e;
-          }
-        });
-      });
-
-    const service = app.get(UserService);
-    await service.createUser();
-  });
-
-  describe('Required', () => {
     it('If there is an ongoing transaction, must participate.', async () => {
       const service = app.get(UsingCallbackService);
       const manager = dataSource.createEntityManager();
@@ -138,6 +88,14 @@ describe('@Transactional UseCase in Nest.js', () => {
   });
 
   describe('Support', () => {
+    /**
+     * To test the Support Propagation option correctly, a top-level transaction-free environment must be configured.
+     * Use explicit queries to remove test data because rollback processing with testQueryRunner should not be used
+     */
+    afterEach(async () => {
+      await dataSource.query('TRUNCATE public.user CASCADE');
+    });
+
     it('If there is an ongoing transaction, must participate.', async () => {
       const service = app.get(UsingCallbackService);
       const manager = dataSource.createEntityManager();

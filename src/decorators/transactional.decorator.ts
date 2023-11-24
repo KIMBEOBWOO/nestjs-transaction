@@ -1,6 +1,6 @@
 import { TransactionOptions } from '../interfaces';
 import { createDecorator } from '@toss/nestjs-aop';
-import { TRANSACTION_DECORATOR } from '../symbols';
+import { TRANSACTION_DECORATOR } from '../common';
 
 /**
  * Transaction Decorator (for Method)

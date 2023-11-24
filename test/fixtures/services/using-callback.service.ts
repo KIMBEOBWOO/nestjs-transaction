@@ -28,6 +28,9 @@ export class UsingCallbackService {
       throw new NotFoundException();
     }
 
+    await this.userService.createUser();
+    await this.userService.createUser();
+
     await this.withoutTransactionService.createUser(id2);
 
     await cb?.();

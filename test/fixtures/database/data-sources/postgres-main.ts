@@ -16,7 +16,7 @@ export const dataSourceOption: DataSourceOptions & SeederOptions = {
   migrations: [__dirname + '/../migrations/postgres-main/**/*{.ts,.js}'],
   seeds: [__dirname + '/../seeds/**/*{.ts,.js}'],
   factories: [__dirname + '/../factories/**/*{.ts,.js}'],
-  // logging: 'all'
+  // logging: 'all',
 };
 
 export default new DataSource(dataSourceOption);

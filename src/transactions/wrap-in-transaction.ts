@@ -1,7 +1,5 @@
-import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
 import { PropagationType, Propagation } from '../enums';
 import { TransactionOptions, ExecutableTransaction } from '../interfaces';
-import { storage } from '../storage';
 
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
@@ -12,18 +10,15 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
     const propagation: PropagationType = options?.propagation || Propagation.REQUIRED;
     const runOriginal = () => fn.apply(this, args);
 
-    const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-    const store = storage.getContext(dataSourceName);
-
     switch (propagation) {
       case Propagation.REQUIRED:
-        if (executableTransaction.isActive(store)) {
+        if (executableTransaction.isActive(options)) {
           return executableTransaction.joinInCurrentTransaction(runOriginal, options);
         } else {
           return executableTransaction.runInNewTransaction(runOriginal, options);
         }
       case Propagation.SUPPORTS:
-        if (executableTransaction.isActive(store)) {
+        if (executableTransaction.isActive(options)) {
           return executableTransaction.joinInCurrentTransaction(runOriginal, options);
         } else {
           return runOriginal();

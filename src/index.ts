@@ -3,3 +3,5 @@ export { Propagation, PropagationType, IsolationLevel, IsolationLevelType } from
 export { runInTransaction, wrapInTransaction } from './transactions';
 export { TransactionalError } from './errors';
 export { TransactionModule } from './module';
+export { TestTransactionModule, TestTypeORMTransactionService } from './mocks';
+export { getTestQueryRunnerToken, getTransactionServiceToken } from './common';
