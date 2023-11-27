@@ -26,20 +26,22 @@ describe('@Transactional UseCase in Nest.js', () => {
   });
 
   afterAll(async () => {
-    await testQueryRunner.release();
+    if (!testQueryRunner.isReleased) {
+      await testQueryRunner.release();
+    }
     await dataSource.destroy();
     await app.close();
   });
 
+  beforeEach(async () => {
+    /**
+     * To test the Support Propagation option correctly, a top-level transaction-free environment must be configured.
+     * Use explicit queries to remove test data because rollback processing with testQueryRunner should not be used
+     */
+    await dataSource.query('TRUNCATE public.user CASCADE');
+  });
+
   describe('Required', () => {
-    beforeEach(async () => {
-      await testQueryRunner.startTransaction();
-    });
-
-    afterEach(async () => {
-      await testQueryRunner.rollbackTransaction();
-    });
-
     it('If there is an ongoing transaction, must participate.', async () => {
       const service = app.get(UsingCallbackService);
       const manager = dataSource.createEntityManager();
@@ -88,14 +90,6 @@ describe('@Transactional UseCase in Nest.js', () => {
   });
 
   describe('Support', () => {
-    /**
-     * To test the Support Propagation option correctly, a top-level transaction-free environment must be configured.
-     * Use explicit queries to remove test data because rollback processing with testQueryRunner should not be used
-     */
-    afterEach(async () => {
-      await dataSource.query('TRUNCATE public.user CASCADE');
-    });
-
     it('If there is an ongoing transaction, must participate.', async () => {
       const service = app.get(UsingCallbackService);
       const manager = dataSource.createEntityManager();

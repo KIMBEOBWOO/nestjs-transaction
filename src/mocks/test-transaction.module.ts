@@ -4,7 +4,6 @@ import { AopModule } from '@toss/nestjs-aop';
 import { TransactionModule } from '../module';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource, QueryRunner } from 'typeorm';
-import { ALSTransactionAspect } from '../providers';
 import { TestTypeORMTransactionService } from './test-typeorm-transaction.service';
 import { getTestQueryRunnerToken, getTransactionServiceToken } from '../common';
 
@@ -16,9 +15,9 @@ export class TestTransactionModule extends TransactionModule {
     super(discoveryService);
   }
 
-  protected static getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
+  protected static override getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
     return [
-      ALSTransactionAspect,
+      ...super.getServiceProividers(),
       {
         provide: getTestQueryRunnerToken(),
         useFactory: (dataSource: DataSource) => {

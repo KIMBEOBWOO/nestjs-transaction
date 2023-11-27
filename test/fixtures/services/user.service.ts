@@ -27,11 +27,12 @@ export class UserService {
         imageList: [UserImage.create()],
       })
       .execute();
+
+    // await this.s3Service.insertImage(param1, param2, param3);
   }
 
   @Transactional()
   async updateUser(userId: string, data: Partial<User>) {
-    // const updateResult = await this.userRepository.update(userId, data);
     const updateResult = await this.dataSoruce.manager.update(User, userId, data);
 
     if (!updateResult?.affected) {

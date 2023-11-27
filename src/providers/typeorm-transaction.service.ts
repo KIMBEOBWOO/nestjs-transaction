@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { QueryRunner } from 'typeorm';
-import { getDataSource, TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
-import { IsolationLevel, IsolationLevelType } from '../enums';
+import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
+import { IsolationLevelType } from '../enums';
 import { ExecutableTransaction, TransactionOptions } from '../interfaces';
-import { Store, storage } from '../storage';
+import { storage } from '../storage';
 
 @Injectable()
 export class TypeORMTransactionService implements ExecutableTransaction {
@@ -30,39 +30,28 @@ export class TypeORMTransactionService implements ExecutableTransaction {
     );
   }
 
-  joinInCurrentTransaction(runOriginal: () => any, options?: TransactionOptions) {
-    const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-
-    const store = storage.getContext(dataSourceName);
-    return storage.run(dataSourceName, store, () => runOriginal());
+  joinInCurrentTransaction(runOriginal: () => Promise<any>) {
+    return runOriginal();
   }
 
-  runInNewTransaction(runOriginal: () => any, options?: TransactionOptions) {
-    const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-    const isolationLevel: IsolationLevelType =
-      options?.isolationLevel || IsolationLevel.READ_COMMITTED;
+  async runInNewTransaction(
+    runOriginal: () => Promise<any>,
+    queryRunner: QueryRunner,
+    isolationLevel: IsolationLevelType,
+  ) {
+    await queryRunner.startTransaction(isolationLevel);
 
-    const queryRunner = getDataSource(dataSourceName).createQueryRunner();
+    try {
+      const result = await runOriginal();
 
-    const newStore: Store<QueryRunner> = {
-      data: queryRunner,
-    };
+      await queryRunner.commitTransaction();
 
-    return storage.run(dataSourceName, newStore, async () => {
-      await queryRunner.startTransaction(isolationLevel);
-
-      try {
-        const result = await runOriginal();
-
-        await queryRunner.commitTransaction();
-
-        return result;
-      } catch (e) {
-        await queryRunner.rollbackTransaction();
-        throw e;
-      } finally {
-        await queryRunner.release();
-      }
-    });
+      return result;
+    } catch (e) {
+      await queryRunner.rollbackTransaction();
+      throw e;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

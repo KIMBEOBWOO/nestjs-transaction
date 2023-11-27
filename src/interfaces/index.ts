@@ -64,3 +64,9 @@ export interface ExecutableTransaction {
    */
   runInNewTransaction(...param: unknown[]): unknown;
 }
+
+export interface Transaction {
+  onCommit(...param: unknown[]): unknown;
+
+  onRollBack(...param: unknown[]): unknown;
+}

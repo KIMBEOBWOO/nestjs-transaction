@@ -1,6 +1,6 @@
 {
   "name": "nestjs-transaction",
-  "version": "0.1.2",
+  "version": "0.1.32",
   "description": "A library that extracts and provides only some of the functions of the 'typeorm-transactional' npm module that are needed to operate in the Nestjs + TypeORM environment",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -46,6 +46,7 @@
   "peerDependencies": {
     "@nestjs/common": "^8 || ^9 || ^10",
     "@nestjs/core": "^8 || ^9 || ^10",
+    "@nestjs/typeorm": "^8 || ^9 || ^10",
     "reflect-metadata": ">= 0.1.12",
     "typeorm": ">= 0.3.0"
   },
