@@ -22,8 +22,8 @@ export class ContextStorage implements Storage {
     return this._storageMap;
   }
 
-  setContext(key: string) {
-    this._storageMap.set(key, new AsyncLocalStorage());
+  setContext(key: string, initalValue?: AsyncLocalStorage<Store>) {
+    this._storageMap.set(key, initalValue || new AsyncLocalStorage());
   }
 
   getContext<DataType>(key: string) {
@@ -40,6 +40,18 @@ export class ContextStorage implements Storage {
     }
 
     return storage.run(newContext, callback);
+  }
+
+  enterWith(key: string, newContext: Store) {
+    const storage = this._storageMap.get(key);
+
+    if (!storage) {
+      throw new Error(
+        'There is no registered DataSource. DataSource must be registered through addTransactionalDataSource.',
+      );
+    }
+
+    storage.enterWith(newContext);
   }
 }
 

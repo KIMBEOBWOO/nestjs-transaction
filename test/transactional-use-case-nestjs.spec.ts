@@ -1,14 +1,13 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
-import { DataSource, QueryRunner } from 'typeorm';
-import { getTestQueryRunnerToken, runInTransaction, TestTransactionModule } from '../src';
+import { DataSource } from 'typeorm';
+import { runInTransaction, TestTransactionModule } from '../src';
 import { AppModule, RollbackError, User, UsingCallbackService } from './fixtures';
 
 describe('@Transactional UseCase in Nest.js', () => {
   let app: INestApplication;
   let dataSource: DataSource;
-  let testQueryRunner: QueryRunner;
 
   const fixureUserId = '27ff4cfc-7656-428c-8da4-918424925c38';
   const fixureUserId2 = '95ce2449-adee-47bb-a068-29d4d3f1b721';
@@ -22,13 +21,9 @@ describe('@Transactional UseCase in Nest.js', () => {
     await app.init();
 
     dataSource = app.get<DataSource>(getDataSourceToken());
-    testQueryRunner = app.get<QueryRunner>(getTestQueryRunnerToken());
   });
 
   afterAll(async () => {
-    if (!testQueryRunner.isReleased) {
-      await testQueryRunner.release();
-    }
     await dataSource.destroy();
     await app.close();
   });

@@ -1,8 +1,8 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, QueryRunner } from 'typeorm';
-import { IsolationLevel, runInTransaction } from '../src';
+import { DataSource, EntityManager, QueryRunner } from 'typeorm';
+import { IsolationLevel, Propagation, runInTransaction } from '../src';
 import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
 import { storage } from '../src/storage';
 import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from './fixtures';
@@ -328,6 +328,62 @@ describe('Single Database @Transactional in Nest.js', () => {
               expect(stillNotExistUser).toBe(null);
             },
             { isolationLevel: IsolationLevel.REPEATABLE_READ },
+          );
+        });
+      });
+
+      describe('Propagation', () => {
+        it('should support "REQUIRED" propagation', async () => {
+          const manager: EntityManager = source();
+
+          await runInTransaction(async () => {
+            const transactionId = await getCurrentTransactionId(manager);
+            await manager.save(User.create(userFixtureId));
+
+            await runInTransaction(
+              async () => {
+                await manager.save(User.create());
+                const transactionIdNested = await getCurrentTransactionId(manager);
+
+                // We expect the nested transaction to be under the same transaction
+                expect(transactionId).toBe(transactionIdNested);
+              },
+              { propagation: Propagation.REQUIRED },
+            );
+          });
+        });
+
+        it('should support "SUPPORTS" propagation if active transaction exists', async () => {
+          const manager: EntityManager = source();
+
+          await runInTransaction(async () => {
+            const transactionId = await getCurrentTransactionId(manager);
+            await manager.save(User.create());
+
+            await runInTransaction(
+              async () => {
+                await manager.save(User.create());
+                const transactionIdNested = await getCurrentTransactionId(manager);
+
+                // We expect the nested transaction to be under the same transaction
+                expect(transactionId).toBe(transactionIdNested);
+              },
+              { propagation: Propagation.SUPPORTS },
+            );
+          });
+        });
+
+        it('should support "SUPPORTS" propagation if active transaction doesn\'t exist', async () => {
+          const manager: EntityManager = source();
+
+          await runInTransaction(
+            async () => {
+              const transactionId = await getCurrentTransactionId(manager);
+
+              // We expect the code to be executed without a transaction
+              expect(transactionId).toBe(null);
+            },
+            { propagation: Propagation.SUPPORTS },
           );
         });
       });

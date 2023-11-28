@@ -3,7 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionModule } from '../../src';
 import { UserController } from './controllers';
 import { DatabaseModule, LOG_DB_NAME, Log, User, Counter, SubCounter } from './database';
-import { UsingCallbackService, UserService, WithoutTransactionalService } from './services';
+import {
+  UsingCallbackService,
+  UserService,
+  WithoutTransactionalService,
+  CustomTransactionProvider,
+} from './services';
 
 @Module({
   imports: [
@@ -13,6 +18,14 @@ import { UsingCallbackService, UserService, WithoutTransactionalService } from '
     TypeOrmModule.forFeature([Log, SubCounter], LOG_DB_NAME),
   ],
   controllers: [UserController],
-  providers: [UserService, UsingCallbackService, WithoutTransactionalService],
+  providers: [
+    UserService,
+    UsingCallbackService,
+    WithoutTransactionalService,
+    {
+      provide: 'CustomTransactionProvider',
+      useClass: CustomTransactionProvider,
+    },
+  ],
 })
 export class AppModule {}

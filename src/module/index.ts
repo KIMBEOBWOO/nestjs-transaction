@@ -18,16 +18,11 @@ import {
   getDataSource,
   initializeTransactionalContext,
   TRANSACTION_MODULE_OPTION_TOKEN,
-  getTransactionServiceToken,
   getTransactionProviderToken,
 } from '../common';
 import { NoRegistedDataSourceError } from '../errors';
 import { TransactionModuleOption } from '../interfaces';
-import {
-  ALSTransactionAspect,
-  TypeOrmTransactionProvider,
-  TypeORMTransactionService,
-} from '../providers';
+import { ALSTransactionAspect, TypeOrmTransactionProvider } from '../providers';
 
 @Module({
   imports: [AopModule, DiscoveryModule],
@@ -83,10 +78,6 @@ export class TransactionModule implements OnModuleInit {
   protected static getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
     return [
       ALSTransactionAspect,
-      {
-        provide: getTransactionServiceToken(),
-        useClass: TypeORMTransactionService,
-      },
       {
         provide: getTransactionProviderToken(),
         useClass: TypeOrmTransactionProvider,
