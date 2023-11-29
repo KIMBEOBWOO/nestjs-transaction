@@ -14,7 +14,10 @@ export class UsingCallbackService {
     private readonly withoutTransactionService: WithoutTransactionalService,
   ) {}
 
-  @Transactional()
+  @Transactional({
+    propagation: Propagation.REQUIRED,
+    customTransactionToken: 'CustomTransactionProvider',
+  })
   async createAndUpdateUserRequied(id: string, id2: string, cb?: () => Promise<unknown>) {
     await this.userService.createUser(id);
     await this.userService.updateUser(id, {

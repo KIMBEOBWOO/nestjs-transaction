@@ -54,7 +54,7 @@ describe('Single Database @Transactional in Nest.js', () => {
     // },
     {
       name: '@InjectDataSource',
-      source: () => app.get(getDataSourceToken()).manager,
+      source: () => dataSource.manager,
     },
     {
       name: '@InjectRepository',

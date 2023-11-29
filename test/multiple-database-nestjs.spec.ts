@@ -66,9 +66,6 @@ describe('Multiple Database @Transactional in Nest.js', () => {
     'The following transaction requirements must be met when using $name.',
     ({ source, source2 }) => {
       it('When different context run in parallel and different database, they must operate in different transactions.', async () => {
-        const manager = source();
-        const manager2 = source2();
-
         let transactionA: number | null = null;
         let transactionB: number | null = null;
         let transactionC: number | null = null;
@@ -76,10 +73,12 @@ describe('Multiple Database @Transactional in Nest.js', () => {
         await Promise.all([
           // DB 1
           runInTransaction(async () => {
+            const manager = source();
             await manager.save(User.create());
             transactionA = await getCurrentTransactionId(manager);
           }),
           runInTransaction(async () => {
+            const manager = source();
             await manager.save(User.create());
             transactionB = await getCurrentTransactionId(manager);
           }),
@@ -87,6 +86,7 @@ describe('Multiple Database @Transactional in Nest.js', () => {
           // DB 2
           runInTransaction(
             async () => {
+              const manager2 = source2();
               await manager2.save(Log.create());
               transactionC = await getCurrentTransactionId(manager2);
             },
@@ -106,24 +106,25 @@ describe('Multiple Database @Transactional in Nest.js', () => {
         expect(transactionA).not.toBe(transactionC);
         expect(transactionB).not.toBe(transactionC);
 
+        const manager = source();
         const users = await manager.find(User, {});
         expect(users.length).toBe(2);
 
+        const manager2 = source2();
         const logs = await manager2.find(Log, {});
         expect(logs.length).toBe(1);
       });
 
       it('If the contexts are nested and the nested databases are different, all subcontexts must participate in the top context of the same database.', async () => {
-        const manager = source();
-        const manager2 = source2();
-
         // DB 2
         await runInTransaction(
           async () => {
+            const manager2 = source2();
             const transactionIdDB_1_TOP = await getCurrentTransactionId(manager2);
 
             // DB 1
             await runInTransaction(async () => {
+              const manager = source();
               const transactionIdDB_2_TOP = await getCurrentTransactionId(manager);
 
               // DB 2
@@ -155,9 +156,11 @@ describe('Multiple Database @Transactional in Nest.js', () => {
           },
         );
 
+        const manager = source();
         const users = await manager.find(User, {});
         expect(users.length).toBe(1);
 
+        const manager2 = source2();
         const logs = await manager2.find(Log, {});
         expect(logs.length).toBe(1);
       });

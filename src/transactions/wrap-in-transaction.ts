@@ -1,24 +1,22 @@
 import { QueryRunner } from 'typeorm';
-import { getDataSource, TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
+import {
+  addOnCommitListenerToStore,
+  addOnRollBackListenerToStore,
+  createStore,
+  emitOnCommitEvent,
+  emitOnRollBackEvent,
+  getStore,
+  hasActiveTransactionStore,
+  TYPEORM_DEFAULT_DATA_SOURCE_NAME,
+} from '../common';
 import { PropagationType, Propagation, IsolationLevel, IsolationLevelType } from '../enums';
 import { TransactionalError } from '../errors';
 import { TransactionOptions, Transaction } from '../interfaces';
 import { storage, Store } from '../storage';
 
-function isActive(options?: TransactionOptions): boolean {
-  const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-  const store = storage.getContext(dataSourceName);
-
-  return (
-    store !== undefined &&
-    store.data !== undefined &&
-    (store.data as QueryRunner)?.isTransactionActive
-  );
-}
-
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
-  transaction: Transaction,
+  transaction?: Transaction,
   options?: TransactionOptions,
 ) => {
   function wrapper(this: unknown, ...args: unknown[]) {
@@ -27,39 +25,55 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
     const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
     const isolationLevel: IsolationLevelType =
       options?.isolationLevel || IsolationLevel.READ_COMMITTED;
-    const store: Store<QueryRunner> = {
-      data: getDataSource(dataSourceName).createQueryRunner(),
-    };
 
-    switch (propagation) {
-      case Propagation.REQUIRED:
-        if (isActive(options)) {
-          return runOriginal();
-        } else {
-          const queryRunner = store.data as QueryRunner;
+    const isActive = hasActiveTransactionStore(dataSourceName);
+    const store: Store<QueryRunner> = isActive
+      ? getStore(dataSourceName)
+      : createStore(dataSourceName);
 
-          return storage.run(dataSourceName, store, async () => {
+    return storage.run(dataSourceName, store, async () => {
+      if (transaction) {
+        //add event to event emitter
+        addOnCommitListenerToStore(store, transaction);
+        addOnRollBackListenerToStore(store, transaction);
+      }
+
+      switch (propagation) {
+        case Propagation.REQUIRED:
+          if (isActive) {
+            return await runOriginal();
+          } else {
+            const queryRunner = store.data as QueryRunner;
+
             try {
               await queryRunner.startTransaction(isolationLevel);
-
               const result = await runOriginal();
 
-              await transaction.onCommit(queryRunner);
+              await queryRunner.commitTransaction();
+              await emitOnCommitEvent(store);
 
               return result;
             } catch (e) {
-              await transaction.onRollBack(queryRunner);
+              await queryRunner.rollbackTransaction();
+              await emitOnRollBackEvent(store);
               throw e;
             } finally {
               await queryRunner.release();
+              storage.enterWith(dataSourceName, {
+                data: undefined,
+                eventEmitter: undefined,
+              });
             }
-          });
-        }
-      case Propagation.SUPPORTS:
-        return runOriginal();
-      default:
-        throw new TransactionalError('Not supported propagation type');
-    }
+          }
+        case Propagation.SUPPORTS:
+          const result = await runOriginal();
+          await emitOnCommitEvent(store);
+
+          return result;
+        default:
+          throw new TransactionalError('Not supported propagation type');
+      }
+    });
   }
 
   return wrapper as Fn;

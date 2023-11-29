@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionModule } from '../../src';
 import { UserController } from './controllers';
 import { DatabaseModule, LOG_DB_NAME, Log, User, Counter, SubCounter } from './database';
+import { CustomTransactionProvider2, UsingHookService } from './services';
 import {
   UsingCallbackService,
   UserService,
@@ -22,9 +23,14 @@ import {
     UserService,
     UsingCallbackService,
     WithoutTransactionalService,
+    UsingHookService,
     {
       provide: 'CustomTransactionProvider',
       useClass: CustomTransactionProvider,
+    },
+    {
+      provide: 'CustomTransactionProvider2',
+      useClass: CustomTransactionProvider2,
     },
   ],
 })

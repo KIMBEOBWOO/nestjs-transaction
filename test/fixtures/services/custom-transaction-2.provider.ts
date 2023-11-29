@@ -3,7 +3,7 @@ import { TypeOrmTransactionProvider } from '../../../src';
 import { UserService } from './user.service';
 
 @Injectable()
-export class CustomTransactionProvider extends TypeOrmTransactionProvider {
+export class CustomTransactionProvider2 extends TypeOrmTransactionProvider {
   constructor(private readonly userService: UserService) {
     super();
   }

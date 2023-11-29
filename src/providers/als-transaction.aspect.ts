@@ -1,17 +1,12 @@
-import { Inject } from '@nestjs/common';
 import { Aspect, LazyDecorator, WrapParams } from '@toss/nestjs-aop';
 import { Transaction, TransactionOptions } from '../interfaces';
-import { getTransactionProviderToken, TRANSACTION_DECORATOR } from '../common';
+import { TRANSACTION_DECORATOR } from '../common';
 import { wrapInTransaction } from '../transactions';
 import { ModuleRef } from '@nestjs/core';
 
 @Aspect(TRANSACTION_DECORATOR)
 export class ALSTransactionAspect implements LazyDecorator<any, TransactionOptions> {
-  constructor(
-    @Inject(getTransactionProviderToken())
-    private readonly transaction: Transaction,
-    private moduleRef: ModuleRef,
-  ) {}
+  constructor(private moduleRef: ModuleRef) {}
 
   wrap({ method, metadata }: WrapParams<any, TransactionOptions>) {
     return async (...args: any) => {
@@ -34,6 +29,6 @@ export class ALSTransactionAspect implements LazyDecorator<any, TransactionOptio
       return customTransaction;
     }
 
-    return this.transaction;
+    return undefined;
   }
 }

@@ -1,12 +1,16 @@
 import { AsyncLocalStorage } from 'async_hooks';
+import { EventEmitter2 } from 'eventemitter2';
 
 export interface Store<T = unknown> {
   /* Data held in the current request context */
   data: T;
+
+  /* Event emitter for the current request context */
+  eventEmitter?: EventEmitter2;
 }
 
 interface Storage {
-  setContext(key: string): void;
+  setContext(key: string, initalValue: AsyncLocalStorage<Store>): void;
   getContext<DataType>(key: string): Store<DataType> | undefined;
   run(key: string, newContext: Store, callback: () => unknown): unknown;
 }
@@ -22,12 +26,20 @@ export class ContextStorage implements Storage {
     return this._storageMap;
   }
 
-  setContext(key: string, initalValue?: AsyncLocalStorage<Store>) {
-    this._storageMap.set(key, initalValue || new AsyncLocalStorage());
+  clear() {
+    this._storageMap.clear();
+  }
+
+  resetContext(key: string) {
+    this._storageMap.set(key, new AsyncLocalStorage());
+  }
+
+  setContext(key: string, initalValue: AsyncLocalStorage<Store>) {
+    this._storageMap.set(key, initalValue);
   }
 
   getContext<DataType>(key: string) {
-    return this._storageMap.get(key)?.getStore() as Store<DataType>;
+    return this._storageMap.get(key)?.getStore() as Store<DataType> | undefined;
   }
 
   run(key: string, newContext: Store, callback: () => unknown) {

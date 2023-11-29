@@ -1,10 +1,10 @@
 import { wrapInTransaction } from '.';
-import { TransactionOptions } from '../interfaces';
-import { TypeOrmTransactionProvider } from '../providers';
+import { Transaction, TransactionOptions } from '../interfaces';
 
 export const runInTransaction = <Func extends (this: unknown) => ReturnType<Func>>(
   fn: Func,
   options?: TransactionOptions,
+  transaction?: Transaction,
 ) => {
-  return wrapInTransaction(fn, new TypeOrmTransactionProvider(), options)();
+  return wrapInTransaction(fn, transaction, options)();
 };
