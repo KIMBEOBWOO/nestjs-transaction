@@ -6,8 +6,15 @@ import { EventEmitter2 } from 'eventemitter2';
 import { QueryRunner } from 'typeorm';
 import { DataSourceName, getDataSource } from '.';
 import { TransactionalError } from '../errors';
-import { Transaction } from '../interfaces';
+import { Transaction, TransactionModuleOption } from '../interfaces';
 import { Store, storage } from '../storage';
+
+type StoreOptionType = Pick<TransactionModuleOption, 'maxEventListeners'>;
+const DEFAUL_MAX_EVENT_LISTENERS = 100;
+
+export const StoreOption: StoreOptionType = {
+  maxEventListeners: DEFAUL_MAX_EVENT_LISTENERS,
+};
 
 /**
  * Get store from storage or create new one
@@ -16,12 +23,8 @@ import { Store, storage } from '../storage';
  *
  * @throws {TransactionalError} Active store is not found
  */
-export const getStore = (dataSourceName: DataSourceName): Store<QueryRunner> => {
+export const getStore = (dataSourceName: DataSourceName): Store<QueryRunner> | undefined => {
   const activeStore = storage.getContext<QueryRunner>(dataSourceName);
-
-  if (!activeStore) {
-    throw new TransactionalError('Active store is not found');
-  }
 
   return activeStore;
 };
@@ -64,15 +67,24 @@ export const ON_ROLLBACK_EVENT_NAME = 'rollback';
  * @throws {TransactionalError} Event emitter is not found
  */
 export const addOnCommitListenerToStore = async (
-  store: Store<QueryRunner>,
-  transaction: Transaction,
+  dataSourceName: DataSourceName,
+  transaction: Transaction | ((...args: unknown[]) => unknown),
+  args: unknown[],
 ) => {
-  if (store?.eventEmitter === undefined) {
-    throw new TransactionalError('Event emitter is not found');
-  }
+  const store = getStore(dataSourceName) || createStore(dataSourceName);
 
-  store.eventEmitter.once(ON_COMMIT_EVENT_NAME, async () => {
-    await transaction.onCommit();
+  storage.run(dataSourceName, store, async () => {
+    if (store?.eventEmitter === undefined) {
+      throw new TransactionalError('Event emitter is not found');
+    }
+
+    store.eventEmitter.once(ON_COMMIT_EVENT_NAME, async () => {
+      if (typeof transaction === 'function') {
+        await transaction(...args);
+      } else {
+        await transaction.onCommit(...args);
+      }
+    });
   });
 };
 
@@ -83,15 +95,24 @@ export const addOnCommitListenerToStore = async (
  * @throws {TransactionalError} Event emitter is not found
  */
 export const addOnRollBackListenerToStore = async (
-  store: Store<QueryRunner>,
-  transaction: Transaction,
+  dataSourceName: DataSourceName,
+  transaction: Transaction | ((...args: unknown[]) => unknown),
+  args: unknown[],
 ) => {
-  if (store?.eventEmitter === undefined) {
-    throw new TransactionalError('Event emitter is not found');
-  }
+  const store = getStore(dataSourceName) || createStore(dataSourceName);
 
-  store.eventEmitter.once(ON_ROLLBACK_EVENT_NAME, async () => {
-    await transaction.onRollBack();
+  storage.run(dataSourceName, store, async () => {
+    if (store?.eventEmitter === undefined) {
+      throw new TransactionalError('Event emitter is not found');
+    }
+
+    store.eventEmitter.once(ON_ROLLBACK_EVENT_NAME, async () => {
+      if (typeof transaction === 'function') {
+        return await transaction(...args);
+      } else {
+        await transaction.onRollBack(...args);
+      }
+    });
   });
 };
 
@@ -127,7 +148,7 @@ const createStoreEventEmitter = (): EventEmitter2 => {
     /**
      * NOTE : if overflows maxListeners, it will throw an "TypeError: The "warning" argument must be of type string or an instance of Error. Received an instance of Error"
      */
-    maxListeners: 10,
+    maxListeners: StoreOption.maxEventListeners,
     ignoreErrors: false,
   });
 };

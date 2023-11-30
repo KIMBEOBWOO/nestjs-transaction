@@ -1,7 +1,5 @@
 import { QueryRunner } from 'typeorm';
 import {
-  addOnCommitListenerToStore,
-  addOnRollBackListenerToStore,
   createStore,
   emitOnCommitEvent,
   emitOnRollBackEvent,
@@ -11,12 +9,11 @@ import {
 } from '../common';
 import { PropagationType, Propagation, IsolationLevel, IsolationLevelType } from '../enums';
 import { TransactionalError } from '../errors';
-import { TransactionOptions, Transaction } from '../interfaces';
+import { TransactionOptions } from '../interfaces';
 import { storage, Store } from '../storage';
 
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
-  transaction?: Transaction,
   options?: TransactionOptions,
 ) => {
   function wrapper(this: unknown, ...args: unknown[]) {
@@ -28,16 +25,10 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
 
     const isActive = hasActiveTransactionStore(dataSourceName);
     const store: Store<QueryRunner> = isActive
-      ? getStore(dataSourceName)
+      ? getStore(dataSourceName) || createStore(dataSourceName)
       : createStore(dataSourceName);
 
     return storage.run(dataSourceName, store, async () => {
-      if (transaction) {
-        //add event to event emitter
-        addOnCommitListenerToStore(store, transaction);
-        addOnRollBackListenerToStore(store, transaction);
-      }
-
       switch (propagation) {
         case Propagation.REQUIRED:
           if (isActive) {
@@ -67,8 +58,12 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
           }
         case Propagation.SUPPORTS:
           const result = await runOriginal();
-          await emitOnCommitEvent(store);
 
+          if (isActive) {
+            return result;
+          }
+
+          await emitOnCommitEvent(store);
           return result;
         default:
           throw new TransactionalError('Not supported propagation type');

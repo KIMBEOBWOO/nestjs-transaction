@@ -16,7 +16,6 @@ export class UsingCallbackService {
 
   @Transactional({
     propagation: Propagation.REQUIRED,
-    customTransactionToken: 'CustomTransactionProvider',
   })
   async createAndUpdateUserRequied(id: string, id2: string, cb?: () => Promise<unknown>) {
     await this.userService.createUser(id);

@@ -3,7 +3,11 @@ import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryRunner } from 'typeorm';
 import { IsolationLevel, Propagation, runInTransaction } from '../src';
-import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
+import {
+  addOnCommitListenerToStore,
+  addOnRollBackListenerToStore,
+  TYPEORM_DEFAULT_DATA_SOURCE_NAME,
+} from '../src/common';
 import { storage } from '../src/storage';
 import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from './fixtures';
 import { getCurrentTransactionId, sleep } from './util';
@@ -127,6 +131,10 @@ describe('Single Database @Transactional in Nest.js', () => {
     'The following transaction requirements must be met when using $name.',
     ({ source }) => {
       const userFixtureId = '75fb75f6-8421-4a4e-991b-7762e8b63a4c';
+
+      beforeEach(() => {
+        jest.restoreAllMocks();
+      });
 
       // We want to check that `save` doesn't create any intermediate transactions
       it('Should not create any intermediate transactions', async () => {
@@ -385,6 +393,68 @@ describe('Single Database @Transactional in Nest.js', () => {
             },
             { propagation: Propagation.SUPPORTS },
           );
+        });
+      });
+
+      describe('Hooks', () => {
+        const dataSourceName = TYPEORM_DEFAULT_DATA_SOURCE_NAME;
+
+        it('If onCommit hook is added in the transaction, it should be called after the transaction is committed', async () => {
+          const onCommitFn = jest.fn();
+          const onRollbackFn = jest.fn();
+
+          await runInTransaction(async () => {
+            addOnCommitListenerToStore(
+              dataSourceName,
+              () => {
+                onCommitFn();
+              },
+              [],
+            );
+
+            addOnRollBackListenerToStore(
+              dataSourceName,
+              () => {
+                onRollbackFn();
+              },
+              [],
+            );
+          });
+
+          expect(onCommitFn).toBeCalledTimes(1);
+          expect(onRollbackFn).toBeCalledTimes(0);
+        });
+
+        it('If onRollback hook is added in the transaction, it should be called after the transaction is rolled back', async () => {
+          const onCommitFn = jest.fn();
+          const onRollbackFn = jest.fn();
+
+          try {
+            await runInTransaction(async () => {
+              addOnCommitListenerToStore(
+                dataSourceName,
+                () => {
+                  onCommitFn();
+                },
+                [],
+              );
+
+              addOnRollBackListenerToStore(
+                dataSourceName,
+                () => {
+                  onRollbackFn();
+                },
+                [],
+              );
+
+              throw new RollbackError();
+            });
+          } catch (e) {
+            if (!(e instanceof RollbackError)) throw e;
+          }
+
+          expect(onCommitFn).toBeCalledTimes(0);
+          expect(onRollbackFn).toBeCalledTimes(1);
         });
       });
     },

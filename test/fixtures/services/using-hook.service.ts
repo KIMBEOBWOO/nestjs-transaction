@@ -1,14 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { Propagation, Transactional } from '../../../src';
+import { OnCommit, OnRollBack, Propagation, Transactional } from '../../../src';
+import { CustomTransactionProvider } from './custom-transaction.provider';
 import { UserService } from './user.service';
 
 @Injectable()
 export class UsingHookService {
   constructor(private readonly userService: UserService) {}
 
-  @Transactional({
-    customTransactionToken: 'CustomTransactionProvider',
-  })
+  @Transactional()
+  @OnCommit({ transactionHook: CustomTransactionProvider })
+  @OnRollBack({ transactionHook: CustomTransactionProvider })
   async createUserRequired(id: string, cb?: () => Promise<unknown>) {
     await this.userService.createUser(id);
 
@@ -17,8 +18,8 @@ export class UsingHookService {
 
   @Transactional({
     propagation: Propagation.SUPPORTS,
-    customTransactionToken: 'CustomTransactionProvider2',
   })
+  @OnCommit({ transactionHook: 'CustomTransactionProvider2' })
   async createUserSupports(id: string, cb?: () => Promise<unknown>) {
     await this.userService.createUser(id);
 

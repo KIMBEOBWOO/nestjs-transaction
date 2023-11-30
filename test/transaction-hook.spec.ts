@@ -2,12 +2,14 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Propagation, runInTransaction, TestTransactionModule } from '../src';
-import { AppModule, CustomTransactionProvider, RollbackError, UserService } from './fixtures';
+import { Propagation, TestTransactionModule } from '../src';
+import { AppModule, CustomTransactionProvider, RollbackError, UsingHookService } from './fixtures';
 
-describe('@Transactional UseCase in Nest.js', () => {
+describe('@Transactional hooks UseCase', () => {
   let app: INestApplication;
   let dataSource: DataSource;
+
+  const fixureUserId = '27ff4cfc-7656-428c-8da4-918424925c38';
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -33,7 +35,7 @@ describe('@Transactional UseCase in Nest.js', () => {
     await dataSource.query('TRUNCATE public.user CASCADE');
   });
 
-  describe('', () => {
+  describe('Nestjs Test', () => {
     beforeEach(() => {
       jest.clearAllMocks();
     });
@@ -43,53 +45,75 @@ describe('@Transactional UseCase in Nest.js', () => {
         case: Propagation.REQUIRED,
         expectedCommitHookCalls: 1,
         expectedRollBackHookCalls: 1,
+        provider: CustomTransactionProvider,
       },
       {
         case: Propagation.SUPPORTS,
         expectedCommitHookCalls: 1,
         expectedRollBackHookCalls: 0,
+        provider: 'CustomTransactionProvider2',
       },
     ];
 
-    describe.each(propagationList)('', ({ case: propagation, expectedCommitHookCalls }) => {
-      it('onCommit hook is called only when the transaction is committed.', async () => {
-        const service = app.get(UserService);
-        const customTransactionProvider = new CustomTransactionProvider(service);
-        const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+    describe.each(propagationList)(
+      '$case',
+      ({ case: propagation, expectedCommitHookCalls, provider }) => {
+        it('onCommit hook is called only when the transaction is committed.', async () => {
+          const service = app.get(UsingHookService);
+          const customTransactionProvider = app.get(provider);
 
-        await runInTransaction(
-          async () => {
-            await service.createUser();
-          },
-          { propagation },
-          customTransactionProvider,
-        );
+          const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+          const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
 
-        expect(onCommit).toBeCalledTimes(expectedCommitHookCalls);
-      });
-    });
+          const targetMethodParams: Parameters<typeof service.createUserRequired> = [fixureUserId];
 
-    describe.each(propagationList)('', ({ case: propagation, expectedRollBackHookCalls }) => {
-      it('onRollBack hook is called only when the transaction is rolled back.', async () => {
-        const service = app.get(UserService);
-        const customTransactionProvider = new CustomTransactionProvider(service);
-        const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
+          if (propagation === Propagation.REQUIRED) {
+            await service.createUserRequired(...targetMethodParams);
+          } else {
+            await service.createUserSupports(...targetMethodParams);
+          }
 
-        try {
-          await runInTransaction(
-            async () => {
-              await service.createUser();
-              throw new RollbackError('Roll back!');
-            },
-            { propagation },
-            customTransactionProvider,
-          );
-        } catch (e) {
-          if (!(e instanceof RollbackError)) throw e;
-        }
+          expect(onCommit).toBeCalledTimes(expectedCommitHookCalls);
+          expectedCommitHookCalls && expect(onCommit).toBeCalledWith(...targetMethodParams);
+          expect(onRollBack).toBeCalledTimes(0);
+        });
+      },
+    );
 
-        expect(onRollBack).toBeCalledTimes(expectedRollBackHookCalls);
-      });
-    });
+    describe.each(propagationList)(
+      '$case',
+      ({ case: propagation, expectedRollBackHookCalls, provider }) => {
+        it('onRollBack hook is called only when the transaction is rolled back.', async () => {
+          const service = app.get(UsingHookService);
+          const customTransactionProvider = app.get(provider);
+
+          const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+          const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
+
+          const throwErrorCallBack = () => {
+            throw new RollbackError('Roll back!');
+          };
+
+          const targetMethodParams: Parameters<typeof service.createUserRequired> = [
+            fixureUserId,
+            throwErrorCallBack,
+          ];
+
+          try {
+            if (propagation === Propagation.REQUIRED) {
+              await service.createUserRequired(...targetMethodParams);
+            } else {
+              await service.createUserSupports(...targetMethodParams);
+            }
+          } catch (e) {
+            if (!(e instanceof RollbackError)) throw e;
+          }
+
+          expect(onCommit).toBeCalledTimes(0);
+          expectedRollBackHookCalls && expect(onRollBack).toBeCalledWith(...targetMethodParams);
+          expect(onRollBack).toBeCalledTimes(expectedRollBackHookCalls);
+        });
+      },
+    );
   });
 });

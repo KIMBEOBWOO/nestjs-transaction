@@ -13,7 +13,9 @@ import {
 
 @Module({
   imports: [
-    TransactionModule.forRoot(),
+    TransactionModule.forRoot({
+      maxEventListeners: 1000,
+    }),
     DatabaseModule,
     TypeOrmModule.forFeature([User, Counter]),
     TypeOrmModule.forFeature([Log, SubCounter], LOG_DB_NAME),
@@ -24,10 +26,7 @@ import {
     UsingCallbackService,
     WithoutTransactionalService,
     UsingHookService,
-    {
-      provide: 'CustomTransactionProvider',
-      useClass: CustomTransactionProvider,
-    },
+    CustomTransactionProvider,
     {
       provide: 'CustomTransactionProvider2',
       useClass: CustomTransactionProvider2,
