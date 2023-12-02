@@ -3,3 +3,5 @@ export const TYPEORM_ENTITY_MANAGER_NAME_PREFIX = TYPEORM_ENTITY_MANAGER_NAME + 
 
 export const TYPEORM_DEFAULT_DATA_SOURCE_NAME = 'default' as const;
 export const TYPEORM_DATA_SOURCE_NAME = '@nestjs-transaction/data-source';
+
+export const TRANSACTION_EVENT_EMIMTTER = '@nestjs-transaction/event-emitter';

@@ -54,7 +54,7 @@ export interface TransactionModuleOption {
  *}
  * ```
  */
-export interface Transaction {
+export interface TransactionEventListener {
   /**
    * After the transaction is committed, the onCommit method is called.
    * @param param

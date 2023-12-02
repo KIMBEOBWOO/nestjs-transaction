@@ -2,10 +2,7 @@ export const TRANSACTION_MODULE_OPTION_TOKEN = Symbol('@nestjs-transaction/typeo
 
 //Transaction lazy decorator inject token
 export const TRANSACTION_DECORATOR = Symbol('TRANSACTION_DECORATOR');
-// OnCommit lazy decorator inject token
-export const TRANSACTION_ON_COMMIT_DECORATOR = Symbol('TRANSACTION_ON_COMMIT_DECORATOR');
-// RollBack lazy decorator inject token
-export const TRANSACTION_ROLL_BACK_DECORATOR = Symbol('TRANSACTION_ROLL_BACK_DECORATOR');
+export const TRANSACTION_EVENT_LISTENER_DECORATOR = Symbol('TRANSACTION_EVENT_LISTENER_DECORATOR');
 
 const TEST_QUERY_RUNNER_TOKEN = Symbol('TEST_QUERY_RUNNER_TOKEN');
 /**

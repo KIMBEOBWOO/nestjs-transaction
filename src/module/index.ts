@@ -22,7 +22,7 @@ import {
 } from '../common';
 import { NoRegistedDataSourceError } from '../errors';
 import { TransactionModuleOption } from '../interfaces';
-import { ALSCommitHookAspect, ALSRollBackHookAspect, ALSTransactionAspect } from '../providers';
+import { ALSTransactionAspect, ALSTransactionEventListenerAspect } from '../providers';
 
 @Module({
   imports: [AopModule, DiscoveryModule],
@@ -86,7 +86,7 @@ export class TransactionModule implements OnModuleInit {
    * @returns ValueProvider[]
    */
   protected static getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
-    return [ALSTransactionAspect, ALSCommitHookAspect, ALSRollBackHookAspect];
+    return [ALSTransactionAspect, ALSTransactionEventListenerAspect];
   }
 
   /**

@@ -1,70 +1,37 @@
 import { AsyncLocalStorage } from 'async_hooks';
-import { EventEmitter2 } from 'eventemitter2';
 
-export interface Store<T = unknown> {
-  /* Data held in the current request context */
-  data: T;
+export type Store = Map<string, any>;
 
-  /* Event emitter for the current request context */
-  eventEmitter?: EventEmitter2;
-}
-
-interface Storage {
-  setContext(key: string, initalValue: AsyncLocalStorage<Store>): void;
-  getContext<DataType>(key: string): Store<DataType> | undefined;
-  run(key: string, newContext: Store, callback: () => unknown): unknown;
-}
-
-export class ContextStorage implements Storage {
-  private readonly _storageMap: Map<string, AsyncLocalStorage<Store>>;
+export class ALSStroage {
+  private storage: AsyncLocalStorage<Store>;
 
   constructor() {
-    this._storageMap = new Map();
+    this.storage = new AsyncLocalStorage();
   }
 
-  get storageMap() {
-    return this._storageMap;
+  get store() {
+    return this.storage.getStore() || new Map<string, any>();
   }
 
-  clear() {
-    this._storageMap.clear();
+  set store(store: Store) {
+    this.storage.enterWith(new Map<string, any>());
   }
 
-  resetContext(key: string) {
-    this._storageMap.set(key, new AsyncLocalStorage());
+  public get<T>(key: string): T {
+    return this.store?.get(key);
   }
 
-  setContext(key: string, initalValue: AsyncLocalStorage<Store>) {
-    this._storageMap.set(key, initalValue);
+  public set(key: string, value: any): void {
+    this.store?.set(key, value);
   }
 
-  getContext<DataType>(key: string) {
-    return this._storageMap.get(key)?.getStore() as Store<DataType> | undefined;
+  public async run<T>(cb: () => Promise<T>): Promise<T> {
+    return this.storage.run(this.store, cb);
   }
 
-  run(key: string, newContext: Store, callback: () => unknown) {
-    const storage = this._storageMap.get(key);
-
-    if (!storage) {
-      throw new Error(
-        'There is no registered DataSource. DataSource must be registered through addTransactionalDataSource.',
-      );
-    }
-
-    return storage.run(newContext, callback);
-  }
-
-  enterWith(key: string, newContext: Store) {
-    const storage = this._storageMap.get(key);
-
-    if (!storage) {
-      throw new Error(
-        'There is no registered DataSource. DataSource must be registered through addTransactionalDataSource.',
-      );
-    }
-
-    storage.enterWith(newContext);
+  enterWithEmptyStore(): void {
+    this.storage.enterWith(new Map<string, any>());
   }
 }
 
-export const storage = new ContextStorage();
+export const storage = new ALSStroage();

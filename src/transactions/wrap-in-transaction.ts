@@ -1,16 +1,10 @@
 import { QueryRunner } from 'typeorm';
-import {
-  createStore,
-  emitOnCommitEvent,
-  emitOnRollBackEvent,
-  getStore,
-  hasActiveTransactionStore,
-  TYPEORM_DEFAULT_DATA_SOURCE_NAME,
-} from '../common';
+import { getDataSource, TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
 import { PropagationType, Propagation, IsolationLevel, IsolationLevelType } from '../enums';
 import { TransactionalError } from '../errors';
 import { TransactionOptions } from '../interfaces';
-import { storage, Store } from '../storage';
+import { storage } from '../storage';
+import { emitAsyncOnCommitEvent, emitAsyncOnRollBackEvent } from './transaciton-hooks';
 
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
@@ -23,48 +17,47 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
     const isolationLevel: IsolationLevelType =
       options?.isolationLevel || IsolationLevel.READ_COMMITTED;
 
-    const isActive = hasActiveTransactionStore(dataSourceName);
-    const store: Store<QueryRunner> = isActive
-      ? getStore(dataSourceName) || createStore(dataSourceName)
-      : createStore(dataSourceName);
+    return storage.run(async () => {
+      const storedQueryRunner = storage.get<QueryRunner | undefined>(dataSourceName);
+      const isTransactionActive =
+        storedQueryRunner !== undefined && storedQueryRunner.isTransactionActive; // Check transaction is active
 
-    return storage.run(dataSourceName, store, async () => {
+      if (!isTransactionActive) {
+        storage.set(dataSourceName, getDataSource(dataSourceName).createQueryRunner()); // If transaction is not active, create new queryRunner and set to storage
+      }
+
       switch (propagation) {
         case Propagation.REQUIRED:
-          if (isActive) {
+          if (isTransactionActive) {
             return await runOriginal();
           } else {
-            const queryRunner = store.data as QueryRunner;
+            const queryRunner = storage.get<QueryRunner>(dataSourceName);
 
             try {
               await queryRunner.startTransaction(isolationLevel);
               const result = await runOriginal();
 
               await queryRunner.commitTransaction();
-              await emitOnCommitEvent(store);
+              await emitAsyncOnCommitEvent();
 
               return result;
             } catch (e) {
               await queryRunner.rollbackTransaction();
-              await emitOnRollBackEvent(store);
+              await emitAsyncOnRollBackEvent();
               throw e;
             } finally {
               await queryRunner.release();
-              storage.enterWith(dataSourceName, {
-                data: undefined,
-                eventEmitter: undefined,
-              });
+              storage.set(dataSourceName, undefined);
             }
           }
         case Propagation.SUPPORTS:
           const result = await runOriginal();
 
-          if (isActive) {
+          if (isTransactionActive) return result;
+          else {
+            await emitAsyncOnCommitEvent();
             return result;
           }
-
-          await emitOnCommitEvent(store);
-          return result;
         default:
           throw new TransactionalError('Not supported propagation type');
       }

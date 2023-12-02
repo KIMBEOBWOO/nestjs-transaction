@@ -2,12 +2,14 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryRunner } from 'typeorm';
-import { IsolationLevel, Propagation, runInTransaction } from '../src';
 import {
-  addOnCommitListenerToStore,
-  addOnRollBackListenerToStore,
-  TYPEORM_DEFAULT_DATA_SOURCE_NAME,
-} from '../src/common';
+  IsolationLevel,
+  Propagation,
+  runInTransaction,
+  runOnTransactionCommit,
+  runOnTransactionRollback,
+} from '../src';
+import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
 import { storage } from '../src/storage';
 import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from './fixtures';
 import { getCurrentTransactionId, sleep } from './util';
@@ -82,9 +84,7 @@ describe('Single Database @Transactional in Nest.js', () => {
       async ({ source }) => {
         await runInTransaction(async () => {
           const target = await source();
-          const storeManager = (
-            storage.getContext(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.data as QueryRunner
-          )?.manager;
+          const storeManager = storage.get<QueryRunner>(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.manager;
 
           expect(target).toBeTruthy();
           expect(storeManager).toBeTruthy();
@@ -397,56 +397,37 @@ describe('Single Database @Transactional in Nest.js', () => {
       });
 
       describe('Hooks', () => {
-        const dataSourceName = TYPEORM_DEFAULT_DATA_SOURCE_NAME;
-
-        it('If onCommit hook is added in the transaction, it should be called after the transaction is committed', async () => {
-          const onCommitFn = jest.fn();
+        it('If transaction is successful, only onCommit hook should be called', async () => {
+          const onCommitFn = jest.fn().mockResolvedValue(true);
           const onRollbackFn = jest.fn();
 
           await runInTransaction(async () => {
-            addOnCommitListenerToStore(
-              dataSourceName,
-              () => {
-                onCommitFn();
-              },
-              [],
-            );
+            runOnTransactionCommit(async () => {
+              await onCommitFn();
+            });
 
-            addOnRollBackListenerToStore(
-              dataSourceName,
-              () => {
-                onRollbackFn();
-              },
-              [],
-            );
+            runOnTransactionRollback(() => {
+              onRollbackFn();
+            });
           });
 
           expect(onCommitFn).toBeCalledTimes(1);
           expect(onRollbackFn).toBeCalledTimes(0);
         });
 
-        it('If onRollback hook is added in the transaction, it should be called after the transaction is rolled back', async () => {
+        it('If transaction is rolled back, only onRollback hook should be called', async () => {
           const onCommitFn = jest.fn();
           const onRollbackFn = jest.fn();
 
           try {
             await runInTransaction(async () => {
-              addOnCommitListenerToStore(
-                dataSourceName,
-                () => {
-                  onCommitFn();
-                },
-                [],
-              );
+              runOnTransactionCommit(async () => {
+                onCommitFn();
+              });
 
-              addOnRollBackListenerToStore(
-                dataSourceName,
-                () => {
-                  onRollbackFn();
-                },
-                [],
-              );
-
+              runOnTransactionRollback(async () => {
+                onRollbackFn();
+              });
               throw new RollbackError();
             });
           } catch (e) {
@@ -455,6 +436,46 @@ describe('Single Database @Transactional in Nest.js', () => {
 
           expect(onCommitFn).toBeCalledTimes(0);
           expect(onRollbackFn).toBeCalledTimes(1);
+        });
+
+        it('If nested transaction is executed, onCommit hook should be called after all nested transactions are executed and committed', async () => {
+          const onCommitFn = jest.fn().mockReturnValue(true);
+
+          await runInTransaction(async () => {
+            runOnTransactionCommit(() => onCommitFn());
+
+            expect(onCommitFn).toBeCalledTimes(0); // onCommitFn should not be called yet
+
+            await runInTransaction(async () => {
+              runOnTransactionCommit(() => onCommitFn());
+            });
+
+            expect(onCommitFn).toBeCalledTimes(0); // onCommitFn should not be called yet
+          });
+
+          expect(onCommitFn).toBeCalledTimes(2);
+        });
+
+        it('If nested transaction is executed, onRollback hook should be called after throw an error in nested transaction and rollback', async () => {
+          const onRollbackFn = jest.fn().mockReturnValue(true);
+
+          try {
+            await runInTransaction(async () => {
+              runOnTransactionRollback(() => onRollbackFn());
+              expect(onRollbackFn).toBeCalledTimes(0); // onRollbackFn should not be called yet
+
+              await runInTransaction(async () => {
+                runOnTransactionRollback(() => onRollbackFn());
+              });
+              expect(onRollbackFn).toBeCalledTimes(0); // onRollbackFn should not be called yet
+
+              throw new RollbackError();
+            });
+          } catch (e) {
+            if (!(e instanceof RollbackError)) throw e;
+          }
+
+          expect(onRollbackFn).toBeCalledTimes(2);
         });
       });
     },

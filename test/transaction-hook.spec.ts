@@ -67,7 +67,7 @@ describe('@Transactional hooks UseCase', () => {
 
           const targetMethodParams: Parameters<typeof service.createUserRequired> = [fixureUserId];
 
-          if (propagation === Propagation.REQUIRED) {
+          if ((propagation as any) === Propagation.REQUIRED) {
             await service.createUserRequired(...targetMethodParams);
           } else {
             await service.createUserSupports(...targetMethodParams);
@@ -100,7 +100,7 @@ describe('@Transactional hooks UseCase', () => {
           ];
 
           try {
-            if (propagation === Propagation.REQUIRED) {
+            if ((propagation as any) === Propagation.REQUIRED) {
               await service.createUserRequired(...targetMethodParams);
             } else {
               await service.createUserSupports(...targetMethodParams);

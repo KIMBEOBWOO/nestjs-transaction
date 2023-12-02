@@ -113,7 +113,7 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   dataSource[TYPEORM_DATA_SOURCE_NAME] = name;
-  storage.resetContext(name);
+  // storage.resetContext(name);
 
   return dataSource;
 };
@@ -125,8 +125,11 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
  * @returns undefined, if queryRunner is not exist
  */
 function getStoreQueryRunner(dataSourceName: DataSourceName): QueryRunner | undefined {
-  const queryRunner: QueryRunner | undefined =
-    storage.getContext<QueryRunner>(dataSourceName)?.data;
+  // const queryRunner: QueryRunner | undefined =
+  //   storage.getContext<QueryRunner>(dataSourceName)?.data;
 
+  // return queryRunner;
+
+  const queryRunner = storage.get<QueryRunner>(dataSourceName);
   return queryRunner;
 }
