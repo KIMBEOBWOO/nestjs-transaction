@@ -1,22 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { TypeOrmTransactionProvider } from '../../../src';
+import { TransactionEventListener } from '../../../src';
 import { UserService } from './user.service';
 
 @Injectable()
-export class CustomTransactionProvider extends TypeOrmTransactionProvider {
-  constructor(private readonly userService: UserService) {
-    super();
+export class CustomTransactionProvider implements TransactionEventListener {
+  constructor(private readonly userService: UserService) {}
+
+  async onCommit(): Promise<void> {
+    await this.userService.userRepository.find();
   }
 
-  override async onCommit(...param: unknown[]): Promise<void> {
-    await this.userService.createUser();
-
-    await super.onCommit(...param);
-    console.log('CustomTransactionProvider onCommit');
-  }
-
-  override async onRollBack(...param: unknown[]): Promise<void> {
-    await super.onRollBack(...param);
-    console.log('CustomTransactionProvider onRollBack');
+  async onRollBack(): Promise<void> {
+    await this.userService.userRepository.find();
   }
 }

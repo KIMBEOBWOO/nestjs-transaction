@@ -17,12 +17,12 @@ import {
   addTransactionalDataSource,
   getDataSource,
   initializeTransactionalContext,
+  StoreOption,
   TRANSACTION_MODULE_OPTION_TOKEN,
-  getTransactionProviderToken,
 } from '../common';
 import { NoRegistedDataSourceError } from '../errors';
 import { TransactionModuleOption } from '../interfaces';
-import { ALSTransactionAspect, TypeOrmTransactionProvider } from '../providers';
+import { ALSTransactionAspect, ALSTransactionEventListenerAspect } from '../providers';
 
 @Module({
   imports: [AopModule, DiscoveryModule],
@@ -38,6 +38,7 @@ export class TransactionModule implements OnModuleInit {
   }
 
   onModuleInit() {
+    // Register the data source that is not registered in the transaction module
     this.discoveryService
       .getProviders()
       .filter(this.isDataSourceInstanceWrapper)
@@ -54,9 +55,18 @@ export class TransactionModule implements OnModuleInit {
       });
   }
 
+  /**
+   * Register the Transaction Module
+   * @param option optional, Transaction Module option
+   * @returns DynamicModule
+   */
   static forRoot(option?: TransactionModuleOption): DynamicModule {
     const moduleOptionProviders = this.getTransacionModuleOptionProviders(option);
     const serviceProviders = this.getServiceProividers();
+
+    if (option?.maxEventListeners !== undefined) {
+      StoreOption.maxEventListeners = option.maxEventListeners;
+    }
 
     return {
       module: TransactionModule,
@@ -76,13 +86,7 @@ export class TransactionModule implements OnModuleInit {
    * @returns ValueProvider[]
    */
   protected static getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
-    return [
-      ALSTransactionAspect,
-      {
-        provide: getTransactionProviderToken(),
-        useClass: TypeOrmTransactionProvider,
-      },
-    ];
+    return [ALSTransactionAspect, ALSTransactionEventListenerAspect];
   }
 
   /**
@@ -101,6 +105,11 @@ export class TransactionModule implements OnModuleInit {
     ];
   }
 
+  /**
+   * Check if the instanceWrapper is a DataSource instance
+   * @param value InstanceWrapper
+   * @returns true if the instanceWrapper is a DataSource instance, false otherwise
+   */
   protected isDataSourceInstanceWrapper = (
     value: InstanceWrapper<any>,
   ): value is InstanceWrapper<DataSource> => {

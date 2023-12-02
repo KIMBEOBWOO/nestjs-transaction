@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { runInTransaction, TestTransactionModule } from '../src';
+import { runInTransaction } from '../src';
 import { AppModule, RollbackError, User, UsingCallbackService } from './fixtures';
 
 describe('@Transactional UseCase in Nest.js', () => {
@@ -14,7 +14,7 @@ describe('@Transactional UseCase in Nest.js', () => {
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
-      imports: [AppModule, TestTransactionModule.forRoot()],
+      imports: [AppModule],
     }).compile();
 
     app = module.createNestApplication();

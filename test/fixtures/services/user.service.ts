@@ -27,8 +27,6 @@ export class UserService {
         imageList: [UserImage.create()],
       })
       .execute();
-
-    // await this.s3Service.insertImage(param1, param2, param3);
   }
 
   @Transactional()

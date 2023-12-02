@@ -1,58 +1,35 @@
 import { AsyncLocalStorage } from 'async_hooks';
 
-export interface Store<T = unknown> {
-  /* Data held in the current request context */
-  data: T;
+export type Store = Map<string, any>;
+
+export interface Storage {
+  get<T>(key: string): T | undefined;
+  set(key: string, value: any): void;
+  run<T>(cb: () => Promise<T>): Promise<T>;
 }
 
-interface Storage {
-  setContext(key: string): void;
-  getContext<DataType>(key: string): Store<DataType> | undefined;
-  run(key: string, newContext: Store, callback: () => unknown): unknown;
-}
-
-export class ContextStorage implements Storage {
-  private readonly _storageMap: Map<string, AsyncLocalStorage<Store>>;
+export class ALSStroage implements Storage {
+  private storage: AsyncLocalStorage<Store>;
 
   constructor() {
-    this._storageMap = new Map();
+    this.storage = new AsyncLocalStorage();
   }
 
-  get storageMap() {
-    return this._storageMap;
+  private get store() {
+    return this.storage.getStore() || new Map<string, any>();
   }
 
-  setContext(key: string, initalValue?: AsyncLocalStorage<Store>) {
-    this._storageMap.set(key, initalValue || new AsyncLocalStorage());
+  public get<T>(key: string): T | undefined {
+    return this.store?.get(key);
   }
 
-  getContext<DataType>(key: string) {
-    return this._storageMap.get(key)?.getStore() as Store<DataType>;
+  public set(key: string, value: any): void {
+    this.store?.set(key, value);
   }
 
-  run(key: string, newContext: Store, callback: () => unknown) {
-    const storage = this._storageMap.get(key);
-
-    if (!storage) {
-      throw new Error(
-        'There is no registered DataSource. DataSource must be registered through addTransactionalDataSource.',
-      );
-    }
-
-    return storage.run(newContext, callback);
-  }
-
-  enterWith(key: string, newContext: Store) {
-    const storage = this._storageMap.get(key);
-
-    if (!storage) {
-      throw new Error(
-        'There is no registered DataSource. DataSource must be registered through addTransactionalDataSource.',
-      );
-    }
-
-    storage.enterWith(newContext);
+  public async run<T>(cb: () => Promise<T>): Promise<T> {
+    return this.storage.run(this.store, cb);
   }
 }
 
-export const storage = new ContextStorage();
+export const storage = new ALSStroage();

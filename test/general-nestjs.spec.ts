@@ -2,7 +2,13 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryRunner } from 'typeorm';
-import { IsolationLevel, Propagation, runInTransaction } from '../src';
+import {
+  IsolationLevel,
+  Propagation,
+  runInTransaction,
+  runOnTransactionCommit,
+  runOnTransactionRollback,
+} from '../src';
 import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
 import { storage } from '../src/storage';
 import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from './fixtures';
@@ -54,7 +60,7 @@ describe('Single Database @Transactional in Nest.js', () => {
     // },
     {
       name: '@InjectDataSource',
-      source: () => app.get(getDataSourceToken()).manager,
+      source: () => dataSource.manager,
     },
     {
       name: '@InjectRepository',
@@ -78,9 +84,7 @@ describe('Single Database @Transactional in Nest.js', () => {
       async ({ source }) => {
         await runInTransaction(async () => {
           const target = await source();
-          const storeManager = (
-            storage.getContext(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.data as QueryRunner
-          )?.manager;
+          const storeManager = storage.get<QueryRunner>(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.manager;
 
           expect(target).toBeTruthy();
           expect(storeManager).toBeTruthy();
@@ -127,6 +131,10 @@ describe('Single Database @Transactional in Nest.js', () => {
     'The following transaction requirements must be met when using $name.',
     ({ source }) => {
       const userFixtureId = '75fb75f6-8421-4a4e-991b-7762e8b63a4c';
+
+      beforeEach(() => {
+        jest.restoreAllMocks();
+      });
 
       // We want to check that `save` doesn't create any intermediate transactions
       it('Should not create any intermediate transactions', async () => {
@@ -385,6 +393,89 @@ describe('Single Database @Transactional in Nest.js', () => {
             },
             { propagation: Propagation.SUPPORTS },
           );
+        });
+      });
+
+      describe('Hooks', () => {
+        it('If transaction is successful, only onCommit hook should be called', async () => {
+          const onCommitFn = jest.fn().mockResolvedValue(true);
+          const onRollbackFn = jest.fn();
+
+          await runInTransaction(async () => {
+            runOnTransactionCommit(async () => {
+              await onCommitFn();
+            });
+
+            runOnTransactionRollback(() => {
+              onRollbackFn();
+            });
+          });
+
+          expect(onCommitFn).toBeCalledTimes(1);
+          expect(onRollbackFn).toBeCalledTimes(0);
+        });
+
+        it('If transaction is rolled back, only onRollback hook should be called', async () => {
+          const onCommitFn = jest.fn();
+          const onRollbackFn = jest.fn();
+
+          try {
+            await runInTransaction(async () => {
+              runOnTransactionCommit(async () => {
+                onCommitFn();
+              });
+
+              runOnTransactionRollback(async () => {
+                onRollbackFn();
+              });
+              throw new RollbackError();
+            });
+          } catch (e) {
+            if (!(e instanceof RollbackError)) throw e;
+          }
+
+          expect(onCommitFn).toBeCalledTimes(0);
+          expect(onRollbackFn).toBeCalledTimes(1);
+        });
+
+        it('If nested transaction is executed, onCommit hook should be called after all nested transactions are executed and committed', async () => {
+          const onCommitFn = jest.fn().mockReturnValue(true);
+
+          await runInTransaction(async () => {
+            runOnTransactionCommit(() => onCommitFn());
+
+            expect(onCommitFn).toBeCalledTimes(0); // onCommitFn should not be called yet
+
+            await runInTransaction(async () => {
+              runOnTransactionCommit(() => onCommitFn());
+            });
+
+            expect(onCommitFn).toBeCalledTimes(0); // onCommitFn should not be called yet
+          });
+
+          expect(onCommitFn).toBeCalledTimes(2);
+        });
+
+        it('If nested transaction is executed, onRollback hook should be called after throw an error in nested transaction and rollback', async () => {
+          const onRollbackFn = jest.fn().mockReturnValue(true);
+
+          try {
+            await runInTransaction(async () => {
+              runOnTransactionRollback(() => onRollbackFn());
+              expect(onRollbackFn).toBeCalledTimes(0); // onRollbackFn should not be called yet
+
+              await runInTransaction(async () => {
+                runOnTransactionRollback(() => onRollbackFn());
+              });
+              expect(onRollbackFn).toBeCalledTimes(0); // onRollbackFn should not be called yet
+
+              throw new RollbackError();
+            });
+          } catch (e) {
+            if (!(e instanceof RollbackError)) throw e;
+          }
+
+          expect(onRollbackFn).toBeCalledTimes(2);
         });
       });
     },

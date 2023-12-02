@@ -7,8 +7,10 @@ import {
   TYPEORM_DEFAULT_DATA_SOURCE_NAME,
   TYPEORM_DATA_SOURCE_NAME,
 } from './constants';
+
 export * from './constants';
 export * from './symbol';
+export * from './store';
 
 interface AddTransactionalDataSourceInput {
   /**
@@ -16,6 +18,9 @@ interface AddTransactionalDataSourceInput {
    */
   name?: DataSourceName;
 
+  /**
+   * Data source, which will be used for @Transactional decorator
+   */
   dataSource: DataSource;
 }
 
@@ -30,25 +35,6 @@ export function getDataSource(key: DataSourceName): DataSource {
   }
 
   return dataSource;
-}
-
-export function getStoreQueryRunner(dataSourceName: DataSourceName, onEmptyFail: true): QueryRunner;
-export function getStoreQueryRunner(
-  dataSourceName: DataSourceName,
-  onEmptyFail?: false,
-): QueryRunner | undefined;
-export function getStoreQueryRunner(
-  dataSourceName: DataSourceName,
-  onEmptyFail = false,
-): QueryRunner | undefined {
-  const queryRunner: QueryRunner | undefined =
-    storage.getContext<QueryRunner>(dataSourceName)?.data;
-
-  if (queryRunner === undefined && onEmptyFail) {
-    throw new Error('Query runner is not set in the running context.');
-  }
-
-  return queryRunner as QueryRunner;
 }
 
 export const initializeTransactionalContext = () => {
@@ -130,7 +116,17 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
   dataSource[TYPEORM_DATA_SOURCE_NAME] = name;
-  storage.setContext(name);
 
   return dataSource;
 };
+
+/**
+ * Get current stored queryRunner from context
+ * @param dataSourceName name of data source
+ * @returns QueryRunner, if queryRunner is exist
+ * @returns undefined, if queryRunner is not exist
+ */
+function getStoreQueryRunner(dataSourceName: DataSourceName): QueryRunner | undefined {
+  const queryRunner = storage.get<QueryRunner>(dataSourceName);
+  return queryRunner;
+}
