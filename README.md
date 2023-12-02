@@ -22,11 +22,14 @@ To facilitate the use of [typeorm-transactional](https://github.com/Aliheym/type
     - [Select the name of the data source to participate](#select-the-name-of-the-data-source-to-participate)
   - [Transaction Propagation](#transaction-propagation)
   - [Isolation Levels](#isolation-levels)
+  - [Commit, RollBack hooks](#commit-rollback-hooks)
   - [Test Mocking](#test-mocking)
     - [Unit Test](#unit-test)
     - [Integration Test](#integration-test)
   - [API](#api)
     - [Transaction Options](#transaction-options)
+    - [runOnTransactionCommit](#runontransactioncommit)
+    - [runOnTransactionRollBack](#runontransactionrollback)
     - [addTransactionalDataSource(input): DataSource](#addtransactionaldatasourceinput-datasource)
 
 <!-- /code_chunk_output -->
@@ -216,6 +219,57 @@ The following isolation level options can be specified:
 
 <br/>
 
+## Commit, RollBack hooks
+
+The library provides commit, rollback hooks provided by existing [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional) as functions ([hooks API](#runontransactioncommit)), but additionally provides the ability to register the method to be executed after commit or rollback success in the form of a method decorator in the form of a listener.
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { TransactionEventListener } from 'nestjs-transactional';
+import { UserService } from './user.service';
+
+@Injectable()
+export class CustomTransactionEventListener implements TransactionEventListener {
+  constructor(private readonly userService: UserService) {}
+
+  async onCommit(...param: unknown[]): Promise<void> {
+    await this.userService.userRepository.find();
+  }
+
+  async onRollBack(e: Error, ...param: unknown[]): Promise<void> {
+    await this.userService.userRepository.find();
+  }
+}
+```
+
+The arguments for both the `onCommit` and `onRollback` methods are the same as the arguments for the target method, but for `onRollBack`, the **error object** that triggered rollback is additionally handed over to the first argument.
+
+<br/>
+
+```typescript
+// user.module.ts
+@Module({
+  ...,
+  controllers: [UserController],
+  providers: [
+    CustomTransactionEventListener,
+  ],
+})
+export class UserModule {}
+```
+
+Transaction commit, rollback defines the functionality that should be executed upon successful implementation of the TransactionEventListener in the form of a provider. It is the same as a typical Nestjs provider and can be implemented by injecting other services within the module.
+
+```typescript
+@Transactional()
+@TransactionalEventListeners(CustomTransactionEventListener)
+async createUser(...param: unknown[]) {
+  ...
+}
+```
+
+<br/>
+
 ## Test Mocking
 
 ### Unit Test
@@ -235,6 +289,8 @@ Repositories, services, etc. can be mocked as usual.
 <br/>
 
 ### Integration Test
+
+> **Note**: This feature was **Deprecated** from `0.1.5^`.
 
 ```tsx
 import { getTestQueryRunnerToken, TestTransactionModule } from 'nestjs-transaction';
@@ -292,9 +348,75 @@ When using the above method in integrated tests using `jest`, each test result i
 }
 ```
 
-- `connectionName`- DataSource name to use for this transactional context ([the data sources](#data-sources))
-- `isolationLevel`- isolation level for transactional context ([isolation levels](#isolation-levels) )
-- `propagation`- propagation behaviors for nest transactional contexts ([propagation behaviors](#transaction-propagation))
+- `connectionName`: The name of the DataSource to use for this transactional context. It allows you to specify a specific DataSource if you have multiple DataSources configured in your application. ([the data sources](#data-sources))
+
+- `isolationLevel`: The isolation level for the transactional context. Isolation levels define the degree to which one transaction must be isolated from the effects of other concurrent transactions. Common isolation levels include READ_COMMITTED, REPEATABLE_READ, and SERIALIZABLE. ([isolation levels](#isolation-levels))
+
+- `propagation`: The propagation behavior for nest transactional contexts. Propagation determines how transactions should be propagated from one method to another. Common propagation behaviors include REQUIRED, REQUIRES_NEW, and NESTED. ([propagation behaviors](#transaction-propagation))
+
+<br/>
+
+### runOnTransactionCommit
+
+The `runOnTransactionCommit` function is part of the `nestjs-transactional` package. It is used within the context of a transactional operation in TypeORM. This function allows you to specify a callback function that will be executed when the transaction is successfully committed.
+
+When you perform a transactional operation, such as inserting, updating, or deleting data in a database, you want to ensure that the changes are applied atomically. This means that either all the changes are committed successfully, or none of them are applied at all. The `runOnTransactionCommit` function provides a way to execute additional logic or actions after the transaction is successfully committed.
+
+To use `runOnTransactionCommit`, you need to pass a callback function as an argument. This callback function will be invoked only if the transaction is committed successfully. You can use this callback function to perform any additional tasks or actions that should be executed after the transaction is completed.
+
+Here's an example of how you can use `runOnTransactionCommit`:
+
+```typescript
+import { runOnTransactionCommit } from 'nestjs-transactional';
+
+@Injectable()
+export class UserService {
+    ...
+    @Transactional()
+    async createUser(id?: string) {
+      const user = User.create({ id });
+
+      await this.dataSource.manager.save(user);
+
+      runOnTransactionCommit(async () => {
+        await this.logService.saveSuccessLog(...);
+        console.log('User Save Success.');
+      });
+    }
+}
+```
+
+<br/>
+
+### runOnTransactionRollBack
+
+The `runOnTransactionRollback` function is part of the `typeorm` package. It is used within the context of a transactional operation in TypeORM. This function allows you to specify a callback function that will be executed when the transaction is rolled back.
+
+A transaction is rolled back when an error occurs during the transactional operation. This means that all changes made during the transaction are undone, and the state of the database is reverted to what it was before the transaction started. The `runOnTransactionRollback` function provides a way to execute additional logic or actions after the transaction is rolled back.
+
+To use `runOnTransactionRollback`, you need to pass a callback function as an argument. This callback function will be invoked only if the transaction is rolled back. You can use this callback function to perform any additional tasks or actions that should be executed after the transaction is rolled back.
+
+Here's an example of how you can use `runOnTransactionRollback`:
+
+```typescript
+import { runOnTransactionRollback } from 'nestjs-transactional';
+
+@Injectable()
+export class UserService {
+    ...
+    @Transactional()
+    async createUser(id?: string) {
+      const user = User.create({ id });
+
+      await this.dataSource.manager.save(user);
+
+      runOnTransactionRollback(async (e: unknown) => {
+        console.log('User Save Failed.', e);
+        await this.logService.saveFailLog(...);
+      });
+    }
+}
+```
 
 <br/>
 

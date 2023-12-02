@@ -6,13 +6,11 @@ import { UserService } from './user.service';
 export class CustomTransactionProvider implements TransactionEventListener {
   constructor(private readonly userService: UserService) {}
 
-  async onCommit(...param: unknown[]): Promise<void> {
-    // await this.userService.userRepository.find();
-    console.log('CustomTransactionProvider', 'onCommit');
+  async onCommit(): Promise<void> {
+    await this.userService.userRepository.find();
   }
 
-  async onRollBack(...param: unknown[]): Promise<void> {
-    // await this.userService.userRepository.find();
-    console.log('CustomTransactionProvider', 'onRollBack');
+  async onRollBack(): Promise<void> {
+    await this.userService.userRepository.find();
   }
 }

@@ -1,7 +1,7 @@
 import { TransactionModuleOption } from '../interfaces';
 
 type StoreOptionType = Pick<TransactionModuleOption, 'maxEventListeners'>;
-const DEFAUL_MAX_EVENT_LISTENERS = 100;
+export const DEFAUL_MAX_EVENT_LISTENERS = 100;
 
 export const StoreOption: StoreOptionType = {
   maxEventListeners: DEFAUL_MAX_EVENT_LISTENERS,

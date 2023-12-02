@@ -11,12 +11,12 @@ type TransactionCallBack = (...param: unknown[]) => Promise<unknown> | unknown;
 
 export const runOnTransactionCommit = (cb: TransactionCallBack) => {
   runWithNewEventEmitter();
-  storage.get<EventEmitter2>(TRANSACTION_EVENT_EMIMTTER).once(ON_COMMIT_EVENT_NAME, cb);
+  storage.get<EventEmitter2>(TRANSACTION_EVENT_EMIMTTER)?.once(ON_COMMIT_EVENT_NAME, cb);
 };
 
 export const runOnTransactionRollback = (cb: TransactionCallBack) => {
   runWithNewEventEmitter();
-  storage.get<EventEmitter2>(TRANSACTION_EVENT_EMIMTTER).once(ON_ROLLBACK_EVENT_NAME, cb);
+  storage.get<EventEmitter2>(TRANSACTION_EVENT_EMIMTTER)?.once(ON_ROLLBACK_EVENT_NAME, cb);
 };
 
 export const emitAsyncOnCommitEvent = async () => {
@@ -24,9 +24,9 @@ export const emitAsyncOnCommitEvent = async () => {
   await storedEventEmitter?.emitAsync(ON_COMMIT_EVENT_NAME);
 };
 
-export const emitAsyncOnRollBackEvent = async () => {
+export const emitAsyncOnRollBackEvent = async (e: unknown) => {
   const storedEventEmitter = storage.get<EventEmitter2 | undefined>(TRANSACTION_EVENT_EMIMTTER);
-  await storedEventEmitter?.emitAsync(ON_ROLLBACK_EVENT_NAME);
+  await storedEventEmitter?.emitAsync(ON_ROLLBACK_EVENT_NAME, e);
 };
 
 /**

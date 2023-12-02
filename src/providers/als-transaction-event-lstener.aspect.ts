@@ -33,7 +33,7 @@ export class ALSTransactionEventListenerAspect implements LazyDecorator<any> {
    */
   protected addListenerToStore(listener: TransactionEventListener, args: unknown[]) {
     runOnTransactionCommit(async () => listener.onCommit(...args));
-    runOnTransactionRollback(async () => listener.onRollBack(...args));
+    runOnTransactionRollback(async (e: unknown) => listener.onRollBack(e, ...args));
   }
 
   private getTransaction(token: TransactionHookOption['transactionHook']) {

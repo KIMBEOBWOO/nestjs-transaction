@@ -32,6 +32,10 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
             return await runOriginal();
           } else {
             const queryRunner = storage.get<QueryRunner>(dataSourceName);
+            if (!queryRunner)
+              throw new TransactionalError(
+                'AsyncLocalStorage throw system error, please re-run your application',
+              );
 
             try {
               await queryRunner.startTransaction(isolationLevel);
@@ -43,7 +47,7 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               return result;
             } catch (e) {
               await queryRunner.rollbackTransaction();
-              await emitAsyncOnRollBackEvent();
+              await emitAsyncOnRollBackEvent(e);
               throw e;
             } finally {
               await queryRunner.release();
