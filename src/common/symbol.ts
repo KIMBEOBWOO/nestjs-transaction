@@ -1,7 +1,12 @@
 export const TRANSACTION_MODULE_OPTION_TOKEN = Symbol('@nestjs-transaction/typeorm-module-option');
 
-//Transaction lazy decorator inject token
+/**
+ * Transaction decorator inject token
+ */
 export const TRANSACTION_DECORATOR = Symbol('TRANSACTION_DECORATOR');
+/**
+ * Event listener decorator inject token
+ */
 export const TRANSACTION_EVENT_LISTENER_DECORATOR = Symbol('TRANSACTION_EVENT_LISTENER_DECORATOR');
 
 const TEST_QUERY_RUNNER_TOKEN = Symbol('TEST_QUERY_RUNNER_TOKEN');

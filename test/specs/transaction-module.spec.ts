@@ -1,12 +1,12 @@
 import { Test } from '@nestjs/testing';
-import { TransactionModule } from '../src';
+import { TransactionModule } from '../../src';
 import {
   DEFAUL_MAX_EVENT_LISTENERS,
   getDataSource,
-  StoreOption,
+  storeOption,
   TYPEORM_DEFAULT_DATA_SOURCE_NAME,
-} from '../src/common';
-import { DatabaseModule, LOG_DB_NAME } from './fixtures';
+} from '../../src/common';
+import { DatabaseModule, LOG_DB_NAME } from '../fixtures';
 
 describe('TransactionModule', () => {
   describe('DataSources', () => {
@@ -54,7 +54,7 @@ describe('TransactionModule', () => {
 
   describe('StoreOption', () => {
     beforeEach(() => {
-      StoreOption.maxEventListeners = DEFAUL_MAX_EVENT_LISTENERS;
+      storeOption.maxEventListeners = DEFAUL_MAX_EVENT_LISTENERS;
     });
 
     it('If the maxEventListeners option is not given, the default value must be 100.', async () => {
@@ -66,7 +66,7 @@ describe('TransactionModule', () => {
       await app.init();
 
       try {
-        expect(StoreOption.maxEventListeners).toBe(DEFAUL_MAX_EVENT_LISTENERS);
+        expect(storeOption.maxEventListeners).toBe(DEFAUL_MAX_EVENT_LISTENERS);
       } finally {
         await app.close();
       }
@@ -85,7 +85,7 @@ describe('TransactionModule', () => {
       await app.init();
 
       try {
-        expect(StoreOption.maxEventListeners).toBe(customMaxEventListeners);
+        expect(storeOption.maxEventListeners).toBe(customMaxEventListeners);
       } finally {
         await app.close();
       }

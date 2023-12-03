@@ -2,8 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { Propagation } from '../src';
-import { AppModule, CustomTransactionProvider, RollbackError, UsingHookService } from './fixtures';
+import { Propagation } from '../../src';
+import { AppModule, CustomTransactionProvider, RollbackError, UsingHookService } from '../fixtures';
 
 describe('@Transactional hooks UseCase', () => {
   let app: INestApplication;

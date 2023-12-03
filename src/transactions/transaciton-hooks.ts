@@ -2,6 +2,7 @@ import { EventEmitter2 } from 'eventemitter2';
 import {
   ON_COMMIT_EVENT_NAME,
   ON_ROLLBACK_EVENT_NAME,
+  storeOption,
   TRANSACTION_EVENT_EMIMTTER,
 } from '../common';
 import { storage } from '../storage';
@@ -37,7 +38,9 @@ const runWithNewEventEmitter = () => {
   const storedEventEmitter = storage.get<EventEmitter2 | undefined>(TRANSACTION_EVENT_EMIMTTER);
 
   if (storedEventEmitter === undefined) {
-    const eventEmitter = new EventEmitter2();
+    const eventEmitter = new EventEmitter2({
+      maxListeners: storeOption.maxEventListeners,
+    });
     storage.set(TRANSACTION_EVENT_EMIMTTER, eventEmitter);
   }
 };
