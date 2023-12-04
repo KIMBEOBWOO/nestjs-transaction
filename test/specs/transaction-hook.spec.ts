@@ -37,75 +37,149 @@ describe('@Transactional hooks UseCase', () => {
     const propagationList = [
       {
         case: Propagation.REQUIRED,
-        expectedCommitHookCalls: 1,
-        expectedRollBackHookCalls: 1,
         listenerProvider: CustomTransactionProvider,
       },
       {
         case: Propagation.SUPPORTS,
-        expectedCommitHookCalls: 1,
-        expectedRollBackHookCalls: 0,
+        listenerProvider: CustomTransactionProvider,
+      },
+      {
+        case: Propagation.NESTED,
         listenerProvider: CustomTransactionProvider,
       },
     ];
 
-    describe.each(propagationList)(
-      '$case',
-      ({ case: propagation, expectedCommitHookCalls, listenerProvider }) => {
-        it('onCommit hook is called only when the transaction is committed.', async () => {
-          const service = app.get(UsingHookService);
-          const customTransactionProvider = app.get(listenerProvider);
+    describe.each(propagationList)('$case', ({ case: propagation, listenerProvider }) => {
+      it('onCommit hook is called only when the transaction is committed.', async () => {
+        const service = app.get(UsingHookService);
+        const customTransactionProvider = app.get(listenerProvider);
 
-          const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
-          const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
+        const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+        const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
 
-          const targetMethodParams: Parameters<typeof service.createUserRequired> = [];
+        const targetMethodParams: Parameters<typeof service.createUserRequired> = [];
 
-          if (propagation === Propagation.REQUIRED) {
+        switch (propagation) {
+          case Propagation.REQUIRED:
             await service.createUserRequired(...targetMethodParams);
-          } else {
+            break;
+          case Propagation.SUPPORTS:
             await service.createUserSupports(...targetMethodParams);
-          }
+            break;
+          case Propagation.NESTED:
+            await service.createUserNested(...targetMethodParams);
+            break;
+        }
 
-          expect(onCommit).toBeCalledTimes(expectedCommitHookCalls);
-          expect(onRollBack).toBeCalledTimes(0);
-        });
-      },
-    );
+        expect(onCommit).toBeCalledTimes(1);
+        expect(onRollBack).toBeCalledTimes(0);
+      });
 
-    describe.each(propagationList)(
-      '$case',
-      ({ case: propagation, expectedRollBackHookCalls, listenerProvider }) => {
-        it('onRollBack hook is called only when the transaction is rolled back.', async () => {
-          const service = app.get(UsingHookService);
-          const customTransactionProvider = app.get(listenerProvider);
+      it('If transaction is nested, onCommit hook is called only once when the all transaction is committed.', async () => {
+        const service = app.get(UsingHookService);
+        const customTransactionProvider = app.get(listenerProvider);
 
-          const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
-          const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
+        const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+        const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
 
-          const throwErrorCallBack = () => {
-            throw new RollbackError('Roll back!');
-          };
+        const targetMethodParams: Parameters<typeof service.createUserRequired> = [];
 
-          const targetMethodParams: Parameters<typeof service.createUserRequired> = [
-            throwErrorCallBack,
-          ];
-
-          try {
-            if (propagation === Propagation.REQUIRED) {
+        await service.createUserRequired(async () => {
+          switch (propagation) {
+            case Propagation.REQUIRED:
               await service.createUserRequired(...targetMethodParams);
-            } else {
+              break;
+            case Propagation.SUPPORTS:
               await service.createUserSupports(...targetMethodParams);
-            }
-          } catch (e) {
-            if (!(e instanceof RollbackError)) throw e;
+              break;
+            case Propagation.NESTED:
+              await service.createUserNested(...targetMethodParams);
+              break;
           }
 
+          // should not be called
           expect(onCommit).toBeCalledTimes(0);
-          expect(onRollBack).toBeCalledTimes(expectedRollBackHookCalls);
         });
-      },
-    );
+
+        // should be called all listeners
+        expect(onCommit).toBeCalledTimes(2);
+        expect(onRollBack).toBeCalledTimes(0);
+      });
+
+      it('onRollBack hook is called only when the transaction is rolled back.', async () => {
+        const service = app.get(UsingHookService);
+        const customTransactionProvider = app.get(listenerProvider);
+
+        const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+        const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
+
+        const throwErrorCallBack = () => {
+          throw new RollbackError('Roll back!');
+        };
+
+        const targetMethodParams: Parameters<typeof service.createUserRequired> = [
+          throwErrorCallBack,
+        ];
+
+        try {
+          switch (propagation) {
+            case Propagation.REQUIRED:
+              await service.createUserRequired(...targetMethodParams);
+              break;
+            case Propagation.SUPPORTS:
+              /**
+               * @NOTE : if supports propagation is root, onRollBack hook is not called.
+               */
+              return;
+            case Propagation.NESTED:
+              await service.createUserNested(...targetMethodParams);
+              break;
+          }
+        } catch (e) {
+          if (!(e instanceof RollbackError)) throw e;
+        }
+
+        expect(onCommit).toBeCalledTimes(0);
+        expect(onRollBack).toBeCalledTimes(1);
+      });
+
+      it('If transaction is nested, onRollBack hook is called only once when the all transaction is rollbacked.', async () => {
+        const service = app.get(UsingHookService);
+        const customTransactionProvider = app.get(listenerProvider);
+
+        const onCommit = jest.spyOn(customTransactionProvider, 'onCommit');
+        const onRollBack = jest.spyOn(customTransactionProvider, 'onRollBack');
+
+        const targetMethodParams: Parameters<typeof service.createUserRequired> = [];
+
+        try {
+          await service.createUserRequired(async () => {
+            switch (propagation) {
+              case Propagation.REQUIRED:
+                await service.createUserRequired(...targetMethodParams);
+                break;
+              case Propagation.SUPPORTS:
+                await service.createUserSupports(...targetMethodParams);
+                break;
+              case Propagation.NESTED:
+                await service.createUserNested(...targetMethodParams);
+                break;
+            }
+
+            // should not be called
+            expect(onRollBack).toBeCalledTimes(0);
+
+            throw new RollbackError('Roll back!');
+          });
+        } catch (e) {
+          if (!(e instanceof RollbackError)) throw e;
+        }
+
+        // should be called all listeners
+        expect(onCommit).toBeCalledTimes(0);
+        expect(onRollBack).toBeCalledTimes(2);
+      });
+    });
 
     describe('Hook executed with proper arguments', () => {
       it('OnCommit hooks are called with the same arguments as the target method.', async () => {

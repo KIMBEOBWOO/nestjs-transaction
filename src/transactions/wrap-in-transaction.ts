@@ -20,7 +20,7 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
     return storage.run(async () => {
       const storedQueryRunner = storage.get<QueryRunner | undefined>(dataSourceName);
       const isTransactionActive =
-        storedQueryRunner !== undefined && storedQueryRunner.isTransactionActive; // Check transaction is active
+        storedQueryRunner !== undefined && storedQueryRunner.isTransactionActive;
 
       if (!isTransactionActive) {
         storage.set(dataSourceName, getDataSource(dataSourceName).createQueryRunner()); // If transaction is not active, create new queryRunner and set to storage
@@ -47,14 +47,12 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               throw new NotRollBackError(e);
             }
           } else {
-            /**
-             * if transaction is not active, create new queryRunner and set to storage
-             */
             const queryRunner = storage.get<QueryRunner>(dataSourceName);
-            if (!queryRunner)
+            if (!queryRunner) {
               throw new TransactionalError(
                 'AsyncLocalStorage throw system error, please re-run your application',
               );
+            }
 
             try {
               await queryRunner.startTransaction(isolationLevel);
@@ -82,10 +80,11 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
             return await runOriginal();
           } else {
             const queryRunner = storage.get<QueryRunner>(dataSourceName);
-            if (!queryRunner)
+            if (!queryRunner) {
               throw new TransactionalError(
                 'AsyncLocalStorage throw system error, please re-run your application',
               );
+            }
 
             try {
               await queryRunner.startTransaction(isolationLevel);
