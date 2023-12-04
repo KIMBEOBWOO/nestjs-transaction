@@ -2,9 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { runInTransaction } from '../src';
-import { AppModule, Log, LOG_DB_NAME, RollbackError, User } from './fixtures';
-import { getCurrentTransactionId } from './util';
+import { runInTransaction } from '../../src';
+import { AppModule, Log, LOG_DB_NAME, RollbackError, User } from '../fixtures';
+import { getCurrentTransactionId } from '../utils';
 
 describe('Multiple Database @Transactional in Nest.js', () => {
   let app: INestApplication;
@@ -120,7 +120,7 @@ describe('Multiple Database @Transactional in Nest.js', () => {
         await runInTransaction(
           async () => {
             const manager2 = source2();
-            const transactionIdDB_1_TOP = await getCurrentTransactionId(manager2);
+            const transactionIdDB_1_TOP = await getCurrentTransactionId(manager2, 'sub');
 
             // DB 1
             await runInTransaction(async () => {
@@ -132,7 +132,7 @@ describe('Multiple Database @Transactional in Nest.js', () => {
                 async () => {
                   await manager2.save(Log.create());
 
-                  const transactionIdDB_1_SUB = await getCurrentTransactionId(manager2);
+                  const transactionIdDB_1_SUB = await getCurrentTransactionId(manager2, 'sub');
 
                   // DB 1
                   await runInTransaction(async () => {
@@ -171,7 +171,7 @@ describe('Multiple Database @Transactional in Nest.js', () => {
 
         try {
           await runInTransaction(async () => {
-            await source().save(User.create(fixureUserId));
+            source().save(User.create(fixureUserId));
 
             await runInTransaction(
               async () => {
@@ -205,7 +205,7 @@ describe('Multiple Database @Transactional in Nest.js', () => {
 
         try {
           await runInTransaction(async () => {
-            await source().save(User.create(fixureUserId));
+            source().save(User.create(fixureUserId));
 
             await runInTransaction(
               async () => {

@@ -2,8 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { runInTransaction } from '../src';
-import { AppModule, RollbackError, User, UsingCallbackService } from './fixtures';
+import { runInTransaction } from '../../src';
+import { AppModule, RollbackError, User, UsingCallbackService } from '../fixtures';
 
 describe('@Transactional UseCase in Nest.js', () => {
   let app: INestApplication;

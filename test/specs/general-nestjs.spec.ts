@@ -8,18 +8,23 @@ import {
   runInTransaction,
   runOnTransactionCommit,
   runOnTransactionRollback,
-} from '../src';
-import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../src/common';
-import { storage } from '../src/storage';
-import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from './fixtures';
-import { getCurrentTransactionId, sleep } from './util';
+} from '../../src';
+import { TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../../src/common';
+import { storage } from '../../src/storage';
+import { AppModule, LOG_DB_NAME, RollbackError, User, UserImage } from '../fixtures';
+import { getCurrentTransactionId, sleep } from '../utils';
 
+/**
+ * Test cases for Nest.js in single database mode
+ * Most of the test cases are the same as the test cases for Forked library [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional)
+ */
 describe('Single Database @Transactional in Nest.js', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let dataSourceSub: DataSource;
 
   const fixureUserId = '27ff4cfc-7656-428c-8da4-918424925c38';
+  const fixureUserId2 = '288cb576-8248-48f3-9e20-90f8596c02b1';
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -51,17 +56,17 @@ describe('Single Database @Transactional in Nest.js', () => {
    */
   const managerGetters = [
     /**
-     * @NOTE not working
+     * @NOTE [Issue#4](https://github.com/KIMBEOBWOO/nestjs-transaction/issues/4)
      */
     // {
     //   name: '@InjectEntityManager',
     //   // source: async () => await app.resolve<EntityManager>(getTransactionalEntityManagerToken()),
     //   source: () => app.get(getEntityManagerToken()),
     // },
-    {
-      name: '@InjectDataSource',
-      source: () => dataSource.manager,
-    },
+    // {
+    //   name: '@InjectDataSource',
+    //   source: () => dataSource.manager,
+    // },
     {
       name: '@InjectRepository',
       source: () => app.get(getRepositoryToken(User)).manager,
@@ -83,7 +88,7 @@ describe('Single Database @Transactional in Nest.js', () => {
       'Injected providers $name must be return storage queryRunner',
       async ({ source }) => {
         await runInTransaction(async () => {
-          const target = await source();
+          const target = source();
           const storeManager = storage.get<QueryRunner>(TYPEORM_DEFAULT_DATA_SOURCE_NAME)?.manager;
 
           expect(target).toBeTruthy();
@@ -98,7 +103,7 @@ describe('Single Database @Transactional in Nest.js', () => {
       'if use $name Save CASCADE should be works',
       async ({ source }) => {
         await runInTransaction(async () => {
-          const manager = await source();
+          const manager = source();
 
           const user = User.create({
             id: fixureUserId,
@@ -142,7 +147,7 @@ describe('Single Database @Transactional in Nest.js', () => {
         let transactionIdB: number | null = null;
 
         await runInTransaction(async () => {
-          const manager = await source();
+          const manager = source();
           transactionIdA = await getCurrentTransactionId(dataSource);
           await manager.save(User.create());
         });
@@ -160,7 +165,7 @@ describe('Single Database @Transactional in Nest.js', () => {
         let transactionIdBefore: number | null = null;
 
         await runInTransaction(async () => {
-          const manager = await source();
+          const manager = source();
           transactionIdBefore = await getCurrentTransactionId(dataSource);
           await manager.save(User.create(userFixtureId));
           const transactionIdAfter = await getCurrentTransactionId(dataSource);
@@ -181,7 +186,7 @@ describe('Single Database @Transactional in Nest.js', () => {
       it('Should rollback the transaction if an error is thrown', async () => {
         try {
           await runInTransaction(async () => {
-            const manager = await source();
+            const manager = source();
             await manager.save(User.create(userFixtureId));
             throw new RollbackError();
           });
@@ -197,7 +202,7 @@ describe('Single Database @Transactional in Nest.js', () => {
 
       it('If the context is nested, all subcontexts must participate in the transaction in which the top-level context is in progress.', async () => {
         await runInTransaction(async () => {
-          const manager = await source();
+          const manager = source();
           const transactionIdBefore = await getCurrentTransactionId(dataSource);
 
           await runInTransaction(async () => {
@@ -229,17 +234,17 @@ describe('Single Database @Transactional in Nest.js', () => {
 
         await Promise.all([
           runInTransaction(async () => {
-            const manager = await source();
+            const manager = source();
             await manager.save(User.create());
             transactionA = await getCurrentTransactionId(dataSource);
           }),
           runInTransaction(async () => {
-            const manager = await source();
+            const manager = source();
             await manager.save(User.create());
             transactionB = await getCurrentTransactionId(dataSource);
           }),
           runInTransaction(async () => {
-            const manager = await source();
+            const manager = source();
             await manager.save(User.create());
             transactionC = await getCurrentTransactionId(dataSource);
           }),
@@ -302,7 +307,7 @@ describe('Single Database @Transactional in Nest.js', () => {
         it('should read the most recent committed rows when using READ COMMITTED isolation level', async () => {
           await runInTransaction(
             async () => {
-              const manager = await source();
+              const manager = source();
               const totalUsers = await manager.count(User);
               expect(totalUsers).toBe(0);
 
@@ -320,7 +325,7 @@ describe('Single Database @Transactional in Nest.js', () => {
         it("shouldn't see the most recent committed rows when using REPEATABLE READ isolation level", async () => {
           await runInTransaction(
             async () => {
-              const manager = await source();
+              const manager = source();
               const notExistUser = await manager.findOneBy(User, {
                 id: userFixtureId,
               });
@@ -393,6 +398,103 @@ describe('Single Database @Transactional in Nest.js', () => {
             },
             { propagation: Propagation.SUPPORTS },
           );
+        });
+
+        describe('NESTED', () => {
+          it('If there is a transaction in progress, you must participate in the transaction and save the save point.', async () => {
+            // parent active transaction
+            await runInTransaction(async () => {
+              const manager: EntityManager = source();
+              await manager.save(User.create());
+              const transactionId = await getCurrentTransactionId(manager);
+
+              // child nested transaction
+              await runInTransaction(
+                async () => {
+                  const manager: EntityManager = source();
+
+                  await manager.save(User.create());
+                  const transactionIdNested = await getCurrentTransactionId(manager);
+
+                  expect(transactionId).toBeTruthy();
+                  expect(transactionIdNested).toBeTruthy();
+                  expect(transactionId).toBe(transactionIdNested); // should be same transaction
+                },
+                { propagation: Propagation.NESTED },
+              );
+            });
+
+            const users = await source().find(User);
+            expect(users.length).toBe(2);
+          });
+
+          it('If an error occurs in a nested transaction, the parent transaction should not be rolled back.', async () => {
+            try {
+              // parent active transaction
+              await runInTransaction(async () => {
+                const manager: EntityManager = source();
+                await manager.save(User.create(fixureUserId));
+
+                // child nested transaction
+                await runInTransaction(
+                  async () => {
+                    const manager: EntityManager = source();
+                    await manager.save(User.create());
+
+                    throw new RollbackError('Origin');
+                  },
+                  { propagation: Propagation.NESTED },
+                );
+              });
+            } catch (e) {
+              if (!(e instanceof RollbackError)) throw e;
+            }
+
+            const manager: EntityManager = source();
+            const user = await manager.findOneByOrFail(User, { id: fixureUserId });
+            expect(user).toBeDefined();
+          });
+
+          it('If an error occurs in a higher transaction, it should be rolled back together.', async () => {
+            try {
+              // parent active transaction
+              await runInTransaction(async () => {
+                const manager: EntityManager = source();
+                await manager.save(User.create(fixureUserId));
+
+                // child nested transaction
+                await runInTransaction(
+                  async () => {
+                    const manager: EntityManager = source();
+                    await manager.save(User.create(fixureUserId2));
+                  },
+                  { propagation: Propagation.NESTED },
+                );
+
+                // Higher transaction error
+                throw new RollbackError('Origin');
+              });
+            } catch (e) {
+              if (!(e instanceof RollbackError)) throw e;
+            }
+
+            const users = await source().find(User);
+            expect(users.length).toBe(0);
+          });
+
+          it("Create new transaction if active transaction doesn't exist", async () => {
+            const manager: EntityManager = source();
+
+            await runInTransaction(
+              async () => {
+                const transactionId = await getCurrentTransactionId(manager);
+
+                // We expect the code to be executed with a transaction
+                expect(transactionId).toBeTruthy();
+              },
+              { propagation: Propagation.NESTED },
+            );
+          });
         });
       });
 

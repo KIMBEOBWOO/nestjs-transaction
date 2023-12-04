@@ -17,7 +17,7 @@ import {
   addTransactionalDataSource,
   getDataSource,
   initializeTransactionalContext,
-  StoreOption,
+  storeOption,
   TRANSACTION_MODULE_OPTION_TOKEN,
 } from '../common';
 import { NoRegistedDataSourceError } from '../errors';
@@ -65,7 +65,7 @@ export class TransactionModule implements OnModuleInit {
     const serviceProviders = this.getServiceProividers();
 
     if (option?.maxEventListeners !== undefined) {
-      StoreOption.maxEventListeners = option.maxEventListeners;
+      storeOption.maxEventListeners = option.maxEventListeners;
     }
 
     return {

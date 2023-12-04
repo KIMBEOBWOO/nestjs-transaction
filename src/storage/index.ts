@@ -32,4 +32,4 @@ export class ALSStroage implements Storage {
   }
 }
 
-export const storage = new ALSStroage();
+export const storage: Storage = new ALSStroage();

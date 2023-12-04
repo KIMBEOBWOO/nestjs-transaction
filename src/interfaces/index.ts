@@ -1,4 +1,4 @@
-import { DataSourceName } from '../common';
+import { DataSourceName, StoreOption } from '../common';
 import { IsolationLevelType, PropagationType } from '../enums';
 
 export interface TransactionOptions {
@@ -20,7 +20,7 @@ export interface TransactionOptions {
   propagation?: PropagationType;
 }
 
-export interface TransactionModuleOption {
+export interface TransactionModuleOption extends Partial<Pick<StoreOption, 'maxEventListeners'>> {
   /**
    * Locate the entered data source name and register it as a transaction data source.
    * If that value is not entered, it automatically registers all data sources.
@@ -30,15 +30,6 @@ export interface TransactionModuleOption {
    * and add the name you set to the property
    */
   dataSourceNames?: DataSourceName[];
-
-  /**
-   * Set the maximum number of event listeners for the transaction.
-   * - If you set a value greater than 'maxEventListeners', you will see a warning.
-   *
-   * @default 100
-   * @NOTE [EventEmitter2 Docs](https://www.npmjs.com/package/eventemitter2) for more information.
-   */
-  maxEventListeners?: number;
 }
 
 /**
@@ -57,13 +48,14 @@ export interface TransactionModuleOption {
 export interface TransactionEventListener {
   /**
    * After the transaction is committed, the onCommit method is called.
-   * @param param
+   * @param param Origin method parameters
    */
   onCommit(...param: unknown[]): unknown;
 
   /**
    * After the transaction is rolled back, the onRollBack method is called.
-   * @param param
+   * @param e Error object that caused the rollback
+   * @param param Origin method parameters
    */
-  onRollBack(...param: unknown[]): unknown;
+  onRollBack(e: Error, ...param: unknown[]): unknown;
 }

@@ -21,3 +21,17 @@ export class TypeOrmUpdatedPatchError extends TransactionalError {
     );
   }
 }
+
+/**
+ * Error that occurs when a transaction is not rolled back
+ */
+export class NotRollBackError extends TransactionalError {
+  constructor(
+    /**
+     * Original error that occurred during transaction
+     */
+    readonly originError: unknown,
+  ) {
+    super(originError instanceof Error ? originError.message : 'NotRollBackError');
+  }
+}

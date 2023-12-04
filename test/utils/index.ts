@@ -1,5 +1,5 @@
 import { DataSource, EntityManager, QueryBuilder } from 'typeorm';
-import { Counter } from './fixtures';
+import { Counter, SubCounter } from '../fixtures';
 
 /**
  * Objects that provide the TypeORM query method
@@ -19,6 +19,7 @@ interface Queryable {
  */
 export const getCurrentTransactionId = async (
   queryable: Queryable | (() => QueryBuilder<any>),
+  db: 'main' | 'sub' = 'main',
 ): Promise<number | null> => {
   let id: string | null = null;
 
@@ -31,9 +32,10 @@ export const getCurrentTransactionId = async (
       .values({ value: () => 'DEFAULT' })
       .execute();
 
+    const schema = db === 'main' ? Counter : SubCounter;
     const result = await qb
       .select('txid_current_if_assigned()', 'txid_current_if_assigned')
-      .from(Counter, 'counter')
+      .from(schema, 'counter')
       .getRawOne();
 
     id = result?.txid_current_if_assigned || null;
