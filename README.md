@@ -205,6 +205,7 @@ The following propagation options can be specified:
 
 - `REQUIRED` (default behaviour) - Support a current transaction, create a new one if none exists.
 - `SUPPORTS` - Support a current transaction, execute non-transactionally if none exists.
+- `NESTED` - Execute within a nested transaction if a current transaction exists, behave like REQUIRED else.
 
 <br/>
 
