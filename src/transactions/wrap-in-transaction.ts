@@ -3,8 +3,9 @@ import { getDataSource, TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
 import { PropagationType, Propagation, IsolationLevel, IsolationLevelType } from '../enums';
 import { NotRollBackError, TransactionalError } from '../errors';
 import { TransactionOptions } from '../interfaces';
+import { NewTransactionDemacrcation } from '../providers';
 import { storage } from '../storage';
-import { emitAsyncOnCommitEvent, emitAsyncOnRollBackEvent } from './transaciton-hooks';
+import { emitAsyncOnCommitEvent } from './transaciton-hooks';
 
 export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => ReturnType<Fn>>(
   fn: Fn,
@@ -16,6 +17,8 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
     const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
     const isolationLevel: IsolationLevelType =
       options?.isolationLevel || IsolationLevel.READ_COMMITTED;
+
+    const newTransactionDemacrcation = new NewTransactionDemacrcation();
 
     return storage.run(async () => {
       const storedQueryRunner = storage.get<QueryRunner | undefined>(dataSourceName);
@@ -47,33 +50,11 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               throw new NotRollBackError(e);
             }
           } else {
-            const queryRunner = storage.get<QueryRunner>(dataSourceName);
-            if (!queryRunner) {
-              throw new TransactionalError(
-                'AsyncLocalStorage throw system error, please re-run your application',
-              );
-            }
-
-            try {
-              await queryRunner.startTransaction(isolationLevel);
-              const result = await runOriginal();
-
-              await queryRunner.commitTransaction();
-              await emitAsyncOnCommitEvent();
-
-              return result;
-            } catch (e) {
-              if (e instanceof NotRollBackError) {
-                throw e.originError;
-              } else {
-                await queryRunner.rollbackTransaction();
-                await emitAsyncOnRollBackEvent(e);
-                throw e;
-              }
-            } finally {
-              await queryRunner.release();
-              storage.set(dataSourceName, undefined);
-            }
+            return newTransactionDemacrcation.runInTransactionDemacrcation(
+              runOriginal,
+              dataSourceName,
+              isolationLevel,
+            );
           }
         case Propagation.REQUIRED:
           if (isTransactionActive) {
@@ -86,26 +67,11 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               );
             }
 
-            try {
-              await queryRunner.startTransaction(isolationLevel);
-              const result = await runOriginal();
-
-              await queryRunner.commitTransaction();
-              await emitAsyncOnCommitEvent();
-
-              return result;
-            } catch (e) {
-              if (e instanceof NotRollBackError) {
-                throw e.originError;
-              } else {
-                await queryRunner.rollbackTransaction();
-                await emitAsyncOnRollBackEvent(e);
-                throw e;
-              }
-            } finally {
-              await queryRunner.release();
-              storage.set(dataSourceName, undefined);
-            }
+            return newTransactionDemacrcation.runInTransactionDemacrcation(
+              runOriginal,
+              dataSourceName,
+              isolationLevel,
+            );
           }
         case Propagation.SUPPORTS:
           const result = await runOriginal();
