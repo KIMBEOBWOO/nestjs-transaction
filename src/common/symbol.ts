@@ -16,3 +16,5 @@ const TEST_QUERY_RUNNER_TOKEN = Symbol('TEST_QUERY_RUNNER_TOKEN');
 export const getTestQueryRunnerToken = () => {
   return TEST_QUERY_RUNNER_TOKEN;
 };
+
+export const TRANSACTION_DEMARCATION_FACTORY_TOKEN = Symbol('TRANSACTION_DEMARCATION_TOKEN');

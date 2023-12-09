@@ -18,11 +18,20 @@ import {
   getDataSource,
   initializeTransactionalContext,
   storeOption,
+  TRANSACTION_DEMARCATION_FACTORY_TOKEN,
   TRANSACTION_MODULE_OPTION_TOKEN,
 } from '../common';
 import { NoRegistedDataSourceError } from '../errors';
 import { TransactionModuleOption } from '../interfaces';
-import { ALSTransactionAspect, ALSTransactionEventListenerAspect } from '../providers';
+import {
+  ALSTransactionAspect,
+  ALSTransactionEventListenerAspect,
+  NewTransactionDemacrcation,
+  RunOriginalAndEventTransactionDemacrcation,
+  RunOriginalTransactionDemacrcation,
+  TransactionDemacrcationFactory,
+  WrapTransactionDemacrcation,
+} from '../providers';
 
 @Module({
   imports: [AopModule, DiscoveryModule],
@@ -86,7 +95,20 @@ export class TransactionModule implements OnModuleInit {
    * @returns ValueProvider[]
    */
   protected static getServiceProividers(): (Type | FactoryProvider | ClassProvider)[] {
-    return [ALSTransactionAspect, ALSTransactionEventListenerAspect];
+    return [
+      ALSTransactionAspect,
+      ALSTransactionEventListenerAspect,
+      {
+        provide: TRANSACTION_DEMARCATION_FACTORY_TOKEN,
+        useFactory: () =>
+          new TransactionDemacrcationFactory(
+            new NewTransactionDemacrcation(),
+            new RunOriginalAndEventTransactionDemacrcation(),
+            new RunOriginalTransactionDemacrcation(),
+            new WrapTransactionDemacrcation(),
+          ),
+      },
+    ];
   }
 
   /**
