@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { getDataSource, TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
 import { PropagationType, Propagation } from '../enums';
 import { TransactionalError } from '../errors';
+import { storage } from '../storage';
 import { TransactionDemacrcation } from './transaction-demacrcation';
 
 @Injectable()
@@ -32,6 +34,13 @@ export class TransactionDemacrcationFactory {
         } else {
           return this.runOriginalAndEventTransactionDemacrcation;
         }
+      case Propagation.REQUIES_NEW:
+        storage.set(
+          TYPEORM_DEFAULT_DATA_SOURCE_NAME,
+          getDataSource(TYPEORM_DEFAULT_DATA_SOURCE_NAME).createQueryRunner(),
+        );
+
+        return this.newTransactionDemacrcation;
       default:
         throw new TransactionalError('Not supported propagation type');
     }

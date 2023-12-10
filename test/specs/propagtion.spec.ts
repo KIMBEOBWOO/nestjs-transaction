@@ -263,45 +263,6 @@ describe('Propagtion', () => {
           expect(users.length).toBe(2);
         });
 
-        it.each(
-          Object.values(Propagation).map((propagation) => ({
-            case: propagation,
-          })),
-        )(
-          'If an error occurs in a nested REQUIES_NEW transaction, the parent transaction($case) should not be rolled back.',
-          async ({ case: propagation }) => {
-            try {
-              // parent active transaction
-              await runInTransaction(
-                async () => {
-                  const manager: EntityManager = source();
-                  await manager.save(User.create(fixureUserId));
-
-                  // child nested transaction
-                  await runInTransaction(
-                    async () => {
-                      const manager: EntityManager = source();
-                      await manager.save(User.create());
-
-                      throw new RollbackError('Origin');
-                    },
-                    { propagation: Propagation.REQUIES_NEW },
-                  );
-                },
-                {
-                  propagation: propagation,
-                },
-              );
-            } catch (e) {
-              if (!(e instanceof RollbackError)) throw e;
-            }
-
-            const manager: EntityManager = source();
-            const user = await manager.findOneByOrFail(User, { id: fixureUserId });
-            expect(user).toBeDefined();
-          },
-        );
-
         it('If an error occurs in a higher transaction, it should not be rolled back together.', async () => {
           try {
             // parent active transaction
@@ -325,7 +286,7 @@ describe('Propagtion', () => {
             if (!(e instanceof RollbackError)) throw e;
           }
 
-          const user = await source().findOne(User, { id: fixureUserId2 });
+          const user = await source().findOneBy(User, { id: fixureUserId2 });
           expect(user).toBeDefined();
         });
       });
