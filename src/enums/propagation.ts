@@ -19,6 +19,11 @@ export const Propagation = {
    * @description If there is already a transaction being performed in the execution context, create Typeorm savepoint and execute it as a nested transaction.
    */
   NESTED: 'NESTED',
+
+  /**
+   * An option that always causes a method call to initiate a new transaction. This option allows the called method to run within the new transaction, even if there is a current active transaction.
+   */
+  REQUIES_NEW: 'REQUIES_NEW',
 } as const;
 
 /**

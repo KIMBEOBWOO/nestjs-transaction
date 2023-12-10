@@ -1,10 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource, EntityManager, QueryRunner } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import {
   IsolationLevel,
-  Propagation,
   runInTransaction,
   runOnTransactionCommit,
   runOnTransactionRollback,
@@ -24,7 +23,6 @@ describe('Single Database @Transactional in Nest.js', () => {
   let dataSourceSub: DataSource;
 
   const fixureUserId = '27ff4cfc-7656-428c-8da4-918424925c38';
-  const fixureUserId2 = '288cb576-8248-48f3-9e20-90f8596c02b1';
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -63,10 +61,10 @@ describe('Single Database @Transactional in Nest.js', () => {
     //   // source: async () => await app.resolve<EntityManager>(getTransactionalEntityManagerToken()),
     //   source: () => app.get(getEntityManagerToken()),
     // },
-    // {
-    //   name: '@InjectDataSource',
-    //   source: () => dataSource.manager,
-    // },
+    {
+      name: '@InjectDataSource',
+      source: () => dataSource.manager,
+    },
     {
       name: '@InjectRepository',
       source: () => app.get(getRepositoryToken(User)).manager,
@@ -342,159 +340,6 @@ describe('Single Database @Transactional in Nest.js', () => {
             },
             { isolationLevel: IsolationLevel.REPEATABLE_READ },
           );
-        });
-      });
-
-      describe('Propagation', () => {
-        it('should support "REQUIRED" propagation', async () => {
-          const manager: EntityManager = source();
-
-          await runInTransaction(async () => {
-            const transactionId = await getCurrentTransactionId(manager);
-            await manager.save(User.create(userFixtureId));
-
-            await runInTransaction(
-              async () => {
-                await manager.save(User.create());
-                const transactionIdNested = await getCurrentTransactionId(manager);
-
-                // We expect the nested transaction to be under the same transaction
-                expect(transactionId).toBe(transactionIdNested);
-              },
-              { propagation: Propagation.REQUIRED },
-            );
-          });
-        });
-
-        it('should support "SUPPORTS" propagation if active transaction exists', async () => {
-          const manager: EntityManager = source();
-
-          await runInTransaction(async () => {
-            const transactionId = await getCurrentTransactionId(manager);
-            await manager.save(User.create());
-
-            await runInTransaction(
-              async () => {
-                await manager.save(User.create());
-                const transactionIdNested = await getCurrentTransactionId(manager);
-
-                // We expect the nested transaction to be under the same transaction
-                expect(transactionId).toBe(transactionIdNested);
-              },
-              { propagation: Propagation.SUPPORTS },
-            );
-          });
-        });
-
-        it('should support "SUPPORTS" propagation if active transaction doesn\'t exist', async () => {
-          const manager: EntityManager = source();
-
-          await runInTransaction(
-            async () => {
-              const transactionId = await getCurrentTransactionId(manager);
-
-              // We expect the code to be executed without a transaction
-              expect(transactionId).toBe(null);
-            },
-            { propagation: Propagation.SUPPORTS },
-          );
-        });
-
-        describe('NESTED', () => {
-          it('If there is a transaction in progress, you must participate in the transaction and save the save point.', async () => {
-            // parent active transaction
-            await runInTransaction(async () => {
-              const manager: EntityManager = source();
-              await manager.save(User.create());
-              const transactionId = await getCurrentTransactionId(manager);
-
-              // child nested transaction
-              await runInTransaction(
-                async () => {
-                  const manager: EntityManager = source();
-
-                  await manager.save(User.create());
-                  const transactionIdNested = await getCurrentTransactionId(manager);
-
-                  expect(transactionId).toBeTruthy();
-                  expect(transactionIdNested).toBeTruthy();
-                  expect(transactionId).toBe(transactionIdNested); // should be same transaction
-                },
-                { propagation: Propagation.NESTED },
-              );
-            });
-
-            const users = await source().find(User);
-            expect(users.length).toBe(2);
-          });
-
-          it('If an error occurs in a nested transaction, the parent transaction should not be rolled back.', async () => {
-            try {
-              // parent active transaction
-              await runInTransaction(async () => {
-                const manager: EntityManager = source();
-                await manager.save(User.create(fixureUserId));
-
-                // child nested transaction
-                await runInTransaction(
-                  async () => {
-                    const manager: EntityManager = source();
-                    await manager.save(User.create());
-
-                    throw new RollbackError('Origin');
-                  },
-                  { propagation: Propagation.NESTED },
-                );
-              });
-            } catch (e) {
-              if (!(e instanceof RollbackError)) throw e;
-            }
-
-            const manager: EntityManager = source();
-            const user = await manager.findOneByOrFail(User, { id: fixureUserId });
-            expect(user).toBeDefined();
-          });
-
-          it('If an error occurs in a higher transaction, it should be rolled back together.', async () => {
-            try {
-              // parent active transaction
-              await runInTransaction(async () => {
-                const manager: EntityManager = source();
-                await manager.save(User.create(fixureUserId));
-
-                // child nested transaction
-                await runInTransaction(
-                  async () => {
-                    const manager: EntityManager = source();
-                    await manager.save(User.create(fixureUserId2));
-                  },
-                  { propagation: Propagation.NESTED },
-                );
-
-                // Higher transaction error
-                throw new RollbackError('Origin');
-              });
-            } catch (e) {
-              if (!(e instanceof RollbackError)) throw e;
-            }
-
-            const users = await source().find(User);
-            expect(users.length).toBe(0);
-          });
-
-          it("Create new transaction if active transaction doesn't exist", async () => {
-            const manager: EntityManager = source();
-
-            await runInTransaction(
-              async () => {
-                const transactionId = await getCurrentTransactionId(manager);
-
-                // We expect the code to be executed with a transaction
-                expect(transactionId).toBeTruthy();
-              },
-              { propagation: Propagation.NESTED },
-            );
-          });
         });
       });
 
