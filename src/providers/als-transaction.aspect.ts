@@ -3,7 +3,7 @@ import { TransactionOptions } from '../interfaces';
 import { TRANSACTION_DECORATOR, TRANSACTION_DEMARCATION_FACTORY_TOKEN } from '../common';
 import { wrapInTransaction } from '../transactions';
 import { Inject } from '@nestjs/common';
-import { TransactionDemacrcationFactory } from './transaction-demacrcation';
+import { TransactionDemacrcationFactory } from './transaction-demacrcation.factory';
 
 @Aspect(TRANSACTION_DECORATOR)
 export class ALSTransactionAspect implements LazyDecorator<any, TransactionOptions> {

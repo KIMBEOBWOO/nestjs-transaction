@@ -26,6 +26,7 @@ import { TransactionModuleOption } from '../interfaces';
 import {
   ALSTransactionAspect,
   ALSTransactionEventListenerAspect,
+  ConnectionManager,
   NewTransactionDemacrcation,
   RunOriginalAndEventTransactionDemacrcation,
   RunOriginalTransactionDemacrcation,
@@ -98,15 +99,18 @@ export class TransactionModule implements OnModuleInit {
     return [
       ALSTransactionAspect,
       ALSTransactionEventListenerAspect,
+      ConnectionManager,
       {
         provide: TRANSACTION_DEMARCATION_FACTORY_TOKEN,
-        useFactory: () =>
-          new TransactionDemacrcationFactory(
-            new NewTransactionDemacrcation(),
-            new RunOriginalAndEventTransactionDemacrcation(),
-            new RunOriginalTransactionDemacrcation(),
-            new WrapTransactionDemacrcation(),
-          ),
+        useFactory: (connectionManager: ConnectionManager) => {
+          return new TransactionDemacrcationFactory(
+            new NewTransactionDemacrcation(connectionManager),
+            new RunOriginalAndEventTransactionDemacrcation(connectionManager),
+            new RunOriginalTransactionDemacrcation(connectionManager),
+            new WrapTransactionDemacrcation(connectionManager),
+          );
+        },
+        inject: [ConnectionManager],
       },
     ];
   }

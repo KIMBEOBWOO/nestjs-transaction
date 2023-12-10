@@ -1,13 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { QueryRunner } from 'typeorm';
 import { DataSourceName, TYPEORM_DEFAULT_DATA_SOURCE_NAME } from '../common';
-import { IsolationLevel, IsolationLevelType, Propagation, PropagationType } from '../enums';
-import { NotRollBackError, TransactionalError } from '../errors';
+import { IsolationLevel, IsolationLevelType } from '../enums';
+import { NotRollBackError } from '../errors';
 import { TransactionOptions } from '../interfaces';
 import { storage } from '../storage';
 import { emitAsyncOnCommitEvent, emitAsyncOnRollBackEvent } from '../transactions';
+import { Connection, ConnectionManager } from './connection-manager';
 
 export abstract class TransactionDemacrcation {
+  constructor(private readonly connectionManager: ConnectionManager) {}
+
   async runInTransactionDemacrcation(
     fn: () => Promise<unknown>,
     options?: TransactionOptions,
@@ -15,70 +17,58 @@ export abstract class TransactionDemacrcation {
     const dataSourceName = options?.connectionName || TYPEORM_DEFAULT_DATA_SOURCE_NAME;
     const isolationLevel: IsolationLevelType =
       options?.isolationLevel || IsolationLevel.READ_COMMITTED;
+    const connection = this.connectionManager.getConnection(dataSourceName);
 
     try {
-      await this.startTransaction(dataSourceName, isolationLevel);
+      await this.startTransaction(connection, isolationLevel);
       const result = await fn();
-      await this.commitTransaction(dataSourceName);
+      await this.commitTransaction(connection);
 
       return result;
     } catch (e) {
-      await this.rollbackTransaction(dataSourceName, e);
+      await this.rollbackTransaction(connection, e);
     } finally {
-      await this.finishTransaction(dataSourceName);
+      await this.finishTransaction(connection, dataSourceName);
     }
-  }
-
-  protected async getConnection(dataSourceName: DataSourceName) {
-    const queryRunner = storage.get<QueryRunner>(dataSourceName);
-
-    if (!queryRunner) {
-      throw new TransactionalError(
-        'AsyncLocalStorage throw system error, please re-run your application',
-      );
-    }
-
-    return queryRunner;
   }
 
   protected abstract startTransaction(
-    dataSourceName: DataSourceName,
+    connection: Connection,
     isolationLevel: IsolationLevelType,
   ): unknown;
-  protected abstract commitTransaction(dataSourceName: DataSourceName): unknown;
-  protected abstract rollbackTransaction(dataSourceName: DataSourceName, e: unknown): unknown;
-  protected abstract finishTransaction(dataSourceName: DataSourceName): unknown;
+  protected abstract commitTransaction(connection: Connection): unknown;
+  protected abstract rollbackTransaction(connection: Connection, e: unknown): unknown;
+  protected abstract finishTransaction(
+    connection: Connection,
+    dataSourceName: DataSourceName,
+  ): unknown;
 }
 
 @Injectable()
 export class NewTransactionDemacrcation extends TransactionDemacrcation {
-  override async startTransaction(
-    dataSourceName: DataSourceName,
-    isolationLevel: IsolationLevelType,
-  ) {
-    const connection = await this.getConnection(dataSourceName);
-    await connection.startTransaction(isolationLevel);
+  override async startTransaction(conneciton: Connection, isolationLevel: IsolationLevelType) {
+    await conneciton.startTransaction(isolationLevel);
   }
 
-  protected override async commitTransaction(dataSourceName: DataSourceName) {
-    const connection = await this.getConnection(dataSourceName);
+  protected override async commitTransaction(connection: Connection) {
     await connection.commitTransaction();
     await emitAsyncOnCommitEvent();
   }
 
-  protected override async rollbackTransaction(dataSourceName: DataSourceName, e: unknown) {
+  protected override async rollbackTransaction(connection: Connection, e: unknown) {
     if (e instanceof NotRollBackError) {
       throw e.originError;
     }
 
-    const connection = await this.getConnection(dataSourceName);
     await connection.rollbackTransaction();
     await emitAsyncOnRollBackEvent(e);
     throw e;
   }
 
-  protected override async finishTransaction(dataSourceName: DataSourceName) {
-    const connection = await this.getConnection(dataSourceName);
+  protected override async finishTransaction(
+    connection: Connection,
+    dataSourceName: DataSourceName,
+  ) {
     await connection.release();
     storage.set(dataSourceName, undefined);
   }
@@ -86,13 +76,11 @@ export class NewTransactionDemacrcation extends TransactionDemacrcation {
 
 @Injectable()
 export class WrapTransactionDemacrcation extends NewTransactionDemacrcation {
-  protected override async commitTransaction(dataSourceName: string): Promise<void> {
-    const connection = await this.getConnection(dataSourceName);
+  protected override async commitTransaction(connection: Connection): Promise<void> {
     await connection.commitTransaction();
   }
 
-  protected override async rollbackTransaction(dataSourceName: DataSourceName, e: unknown) {
-    const connection = await this.getConnection(dataSourceName);
+  protected override async rollbackTransaction(connection: Connection, e: unknown) {
     await connection.rollbackTransaction();
     throw new NotRollBackError(e);
   }
@@ -137,40 +125,5 @@ export class RunOriginalAndEventTransactionDemacrcation extends TransactionDemac
 
   protected finishTransaction() {
     return;
-  }
-}
-
-@Injectable()
-export class TransactionDemacrcationFactory {
-  constructor(
-    private readonly newTransactionDemacrcation: TransactionDemacrcation,
-    private readonly runOriginalAndEventTransactionDemacrcation: TransactionDemacrcation,
-    private readonly runOriginalTransactionDemacrcation: TransactionDemacrcation,
-    private readonly wrapTransactionDemacrcation: TransactionDemacrcation,
-  ) {}
-
-  getInstance(propagation: PropagationType, isActive: boolean): TransactionDemacrcation {
-    switch (propagation) {
-      case Propagation.NESTED:
-        if (isActive) {
-          return this.wrapTransactionDemacrcation;
-        } else {
-          return this.newTransactionDemacrcation;
-        }
-      case Propagation.REQUIRED:
-        if (isActive) {
-          return this.runOriginalTransactionDemacrcation;
-        } else {
-          return this.newTransactionDemacrcation;
-        }
-      case Propagation.SUPPORTS:
-        if (isActive) {
-          return this.runOriginalTransactionDemacrcation;
-        } else {
-          return this.runOriginalAndEventTransactionDemacrcation;
-        }
-      default:
-        throw new TransactionalError('Not supported propagation type');
-    }
   }
 }

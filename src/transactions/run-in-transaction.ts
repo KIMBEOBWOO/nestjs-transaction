@@ -6,13 +6,15 @@ import {
   RunOriginalAndEventTransactionDemacrcation,
   RunOriginalTransactionDemacrcation,
   WrapTransactionDemacrcation,
+  ConnectionManager,
 } from '../providers';
 
+const connectionManager = new ConnectionManager();
 const demacrcationFactory = new TransactionDemacrcationFactory(
-  new NewTransactionDemacrcation(),
-  new RunOriginalAndEventTransactionDemacrcation(),
-  new RunOriginalTransactionDemacrcation(),
-  new WrapTransactionDemacrcation(),
+  new NewTransactionDemacrcation(connectionManager),
+  new RunOriginalAndEventTransactionDemacrcation(connectionManager),
+  new RunOriginalTransactionDemacrcation(connectionManager),
+  new WrapTransactionDemacrcation(connectionManager),
 );
 
 export const runInTransaction = <Func extends (this: unknown) => ReturnType<Func>>(
