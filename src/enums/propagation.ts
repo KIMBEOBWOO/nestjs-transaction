@@ -19,6 +19,12 @@ export const Propagation = {
    * @description If there is already a transaction being performed in the execution context, create Typeorm savepoint and execute it as a nested transaction.
    */
   NESTED: 'NESTED',
+
+  /**
+   * Always create a new transaction and execute it.
+   * @description Create a new transaction and execute it, and if there is already a transaction being performed in the execution context, stop the existing transaction and execute it.
+   */
+  REQUIRES_NEW: 'REQUIRED_NEW',
 } as const;
 
 /**
