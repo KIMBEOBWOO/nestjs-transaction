@@ -57,6 +57,7 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
             } catch (e) {
               if (e instanceof NotRollBackError) {
                 await queryRunner.commitTransaction();
+                await emitAsyncOnCommitEvent();
                 throw e.originError;
               } else {
                 await queryRunner.rollbackTransaction();
@@ -86,6 +87,7 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
             } catch (e) {
               if (e instanceof NotRollBackError) {
                 await queryRunner.commitTransaction();
+                await emitAsyncOnCommitEvent();
                 throw e.originError;
               } else {
                 await queryRunner.rollbackTransaction();
