@@ -22,10 +22,6 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
       const isTransactionActive =
         storedQueryRunner !== undefined && storedQueryRunner.isTransactionActive;
 
-      if (!isTransactionActive) {
-        storage.set(dataSourceName, getDataSource(dataSourceName).createQueryRunner()); // If transaction is not active, create new queryRunner and set to storage
-      }
-
       switch (propagation) {
         case Propagation.NESTED:
           if (isTransactionActive) {
@@ -47,12 +43,8 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               throw new NotRollBackError(e);
             }
           } else {
-            const queryRunner = storage.get<QueryRunner>(dataSourceName);
-            if (!queryRunner) {
-              throw new TransactionalError(
-                'AsyncLocalStorage throw system error, please re-run your application',
-              );
-            }
+            const queryRunner = getDataSource(dataSourceName).createQueryRunner();
+            storage.set(dataSourceName, queryRunner);
 
             try {
               await queryRunner.startTransaction(isolationLevel);
@@ -64,6 +56,7 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               return result;
             } catch (e) {
               if (e instanceof NotRollBackError) {
+                await queryRunner.commitTransaction();
                 throw e.originError;
               } else {
                 await queryRunner.rollbackTransaction();
@@ -77,14 +70,10 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
           }
         case Propagation.REQUIRED:
           if (isTransactionActive) {
-            return await runOriginal();
+            return runOriginal();
           } else {
-            const queryRunner = storage.get<QueryRunner>(dataSourceName);
-            if (!queryRunner) {
-              throw new TransactionalError(
-                'AsyncLocalStorage throw system error, please re-run your application',
-              );
-            }
+            const queryRunner = getDataSource(dataSourceName).createQueryRunner();
+            storage.set(dataSourceName, queryRunner);
 
             try {
               await queryRunner.startTransaction(isolationLevel);
@@ -96,6 +85,7 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
               return result;
             } catch (e) {
               if (e instanceof NotRollBackError) {
+                await queryRunner.commitTransaction();
                 throw e.originError;
               } else {
                 await queryRunner.rollbackTransaction();
@@ -108,12 +98,49 @@ export const wrapInTransaction = <Fn extends (this: any, ...args: any[]) => Retu
             }
           }
         case Propagation.SUPPORTS:
-          const result = await runOriginal();
+          try {
+            const result = await runOriginal();
 
-          if (isTransactionActive) return result;
-          else {
+            if (isTransactionActive) return result;
+            else {
+              await emitAsyncOnCommitEvent();
+              return result;
+            }
+          } catch (e) {
+            if (e instanceof NotRollBackError) {
+              throw e.originError;
+            }
+
+            throw e;
+          }
+        case Propagation.REQUIRES_NEW:
+          const queryRunner = getDataSource(dataSourceName).createQueryRunner();
+          storage.set(dataSourceName, queryRunner);
+
+          try {
+            await queryRunner.startTransaction(isolationLevel);
+
+            const result = await runOriginal();
+
+            await queryRunner.commitTransaction();
             await emitAsyncOnCommitEvent();
+
             return result;
+          } catch (e) {
+            if (e instanceof NotRollBackError) {
+              await queryRunner.commitTransaction();
+              await emitAsyncOnCommitEvent();
+              throw e.originError;
+            } else {
+              await queryRunner.rollbackTransaction();
+              await emitAsyncOnRollBackEvent(e);
+
+              if (!isTransactionActive) throw e;
+              throw new NotRollBackError(e);
+            }
+          } finally {
+            await queryRunner.release();
+            storage.set(dataSourceName, undefined);
           }
         default:
           throw new TransactionalError('Not supported propagation type');

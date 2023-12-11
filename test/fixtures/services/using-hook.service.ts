@@ -28,4 +28,13 @@ export class UsingHookService {
   async createUserNested(cb?: () => Promise<unknown>, ...param: unknown[]) {
     await cb?.();
   }
+
+  @Transactional({
+    propagation: Propagation.REQUIRES_NEW,
+  })
+  @TransactionalEventListeners(CustomTransactionProvider)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async createUserRequiresNew(cb?: () => Promise<unknown>, ...param: unknown[]) {
+    await cb?.();
+  }
 }
