@@ -1,6 +1,6 @@
 # Nestjs Transactional
 
-[![npm version](http://img.shields.io/npm/v/typeorm-transactional.svg?style=flat)](https://npmjs.org/package/nestjs-transactional 'View this project on npm')
+![npm](https://img.shields.io/npm/dt/nestjs-transaction) ![npm](https://img.shields.io/npm/v/nestjs-transaction) ![GitHub issues](https://img.shields.io/github/issues-raw/KIMBEOBWOO/nestjs-transaction) ![GitHub Repo stars](https://img.shields.io/github/stars/KIMBEOBWOO/nestjs-transaction?style=social) ![GitHub forks](https://img.shields.io/github/forks/KIMBEOBWOO/nestjs-transaction?style=social)
 
 ## It's a fork of [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional) for Nestjs customization
 
@@ -8,29 +8,51 @@ A `Transactional` Method Decorator for [typeorm](http://typeorm.io/) that uses [
 
 To facilitate the use of [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional) in Nest.js, several features have been added, including the `TransactionModule`, and the [@toss/nestjsaop](https://www.npmjs.com/package/@toss/nestjs-aop) library is being used to provide transaction capabilities that can be customized based on injectable providers in future services.
 
+#### what's different
+
+- **NESTED propagation properties have different behavior**
+  NESTED transaction behaves the same as REQUIRED if it is a root transaction, but does not propagate its own rollback to parents if it is a child transaction
+- **Declarative Event Hook feature**
+  Declarative definition of handlers for transaction-related events such as onCommit, onRollback, etc., thus eliminating duplication of event handlers and designing flexible structures.
+- **Includes testing and management of multiple data sources**
+
+<br/>
+
+## Index
+
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
 <!-- code_chunk_output -->
 
 - [Nestjs Transactional](#nestjs-transactional)
   - [It's a fork of typeorm-transactional for Nestjs customization](#its-a-fork-of-typeorm-transactionalhttpsgithubcomaliheymtypeorm-transactional-for-nestjs-customization)
+      - [what's different](#whats-different)
+  - [Index](#index)
   - [Installation](#installation)
-  - [Usage](#usage)
-  - [Using Transactional Decorator](#using-transactional-decorator)
-  - [Data Sources](#data-sources)
+  - [1️⃣ Usage](#1️⃣-usage)
+  - [2️⃣ Using Transactional Decorator](#2️⃣-using-transactional-decorator)
+  - [3️⃣ Data Sources](#3️⃣-data-sources)
     - [Multiple DataSources](#multiple-datasources)
     - [Select the name of the data source to participate](#select-the-name-of-the-data-source-to-participate)
-  - [Transaction Propagation](#transaction-propagation)
-  - [Isolation Levels](#isolation-levels)
-  - [Commit, RollBack hooks](#commit-rollback-hooks)
-  - [Test Mocking](#test-mocking)
+  - [4️⃣ Transaction Propagation](#4️⃣-transaction-propagation)
+    - [`REQUIRED(default)`](#requireddefault)
+    - [`SUPPORTS`](#supports)
+    - [`NESTED`](#nested)
+    - [`REQUIRES_NEW`](#requires_new)
+  - [5️⃣ Isolation Levels](#5️⃣-isolation-levels)
+  - [6️⃣ Commit, RollBack hooks](#6️⃣-commit-rollback-hooks)
+  - [7️⃣ Test Mocking](#7️⃣-test-mocking)
     - [Unit Test](#unit-test)
     - [Integration Test](#integration-test)
-  - [API](#api)
+  - [8️⃣ API](#8️⃣-api)
     - [Transaction Options](#transaction-options)
     - [runOnTransactionCommit](#runontransactioncommit)
     - [runOnTransactionRollBack](#runontransactionrollback)
     - [addTransactionalDataSource(input): DataSource](#addtransactionaldatasourceinput-datasource)
+- [⛔️ Bug Report](#️-bug-report)
+    - [`@Transactonal` does not work when using an injected entity manager by `@InjectEntityManager`](#transactonal-does-not-work-when-using-an-injected-entity-manager-by-injectentitymanager)
+- [👍 Stay in touch](#-stay-in-touch)
+- [📜 License](#-license)
 
 <!-- /code_chunk_output -->
 
@@ -59,7 +81,7 @@ yarn add typeorm reflect-metadata
 
 <br/>
 
-## Usage
+## 1️⃣ Usage
 
 New versions of TypeORM use `DataSource` instead of `Connection`, so most of the API has been changed and the old API has become deprecated.
 
@@ -87,7 +109,7 @@ Unlike `typeorm-transactional-cls-hooked`, you do not need to use `BaseRepositor
 
 <br/>
 
-## Using Transactional Decorator
+## 2️⃣ Using Transactional Decorator
 
 - Every service method that needs to be transactional, need to use the `@Transactional()` decorator
 - The decorator can take a `connectionName` as argument (by default it is `default`) to specify [the data source ](#data-sources) to be user
@@ -125,7 +147,7 @@ export class PostService {
 
 <br/>
 
-## Data Sources
+## 3️⃣ Data Sources
 
 ### Multiple DataSources
 
@@ -199,18 +221,30 @@ TransactionModule.forRoot({
 
 <br/>
 
-## Transaction Propagation
+## 4️⃣ Transaction Propagation
 
-The following propagation options can be specified:
+The following propagation options can be specified
 
-- `REQUIRED` (default behaviour) - Support a current transaction, create a new one if none exists.
-- `SUPPORTS` - Support a current transaction, execute non-transactionally if none exists.
-- `NESTED` - Execute within a nested transaction if a current transaction exists, behave like `REQUIRED` else.
-- `REQUIRES_NEW` - If this propagation option is applied, stop the transaction in progress and always start the transaction anew with the new database connection.
+### `REQUIRED(default)`
+
+**Join** if there is a **transaction in progress**, and if there is **no transaction in progress**, **start a new transaction** with yourself as the root transaction.
+
+### `SUPPORTS`
+
+**Join** if there is a **transaction in progress**. This is exactly the same as what `REQUIRED` does. But if there is **no transaction in progress**, run a query **without a transaction.**
+
+### `NESTED`
+
+If there is **no transaction in progress**, **start a new transaction** with yourself as the root transaction. This is exactly the same as what `REQUIRED` does. If there is a transaction in progress, start a nested transaction.
+Errors within overlapping transactions are not captured and rolled back by higher transactions. (If you want to spread errors within overlapping transactions to higher transactions, you should use 'REQUIRED.')
+
+### `REQUIRES_NEW`
+
+Always bring a new connection and **start a new transaction**.
 
 <br/>
 
-## Isolation Levels
+## 5️⃣ Isolation Levels
 
 The following isolation level options can be specified:
 
@@ -221,7 +255,9 @@ The following isolation level options can be specified:
 
 <br/>
 
-## Commit, RollBack hooks
+## 6️⃣ Commit, RollBack hooks
+
+With a custom event listener, **you can effectively design duplicate transaction event hooks**.
 
 The library provides commit, rollback hooks provided by existing [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional) as functions ([hooks API](#runontransactioncommit)), but additionally provides the ability to register the method to be executed after commit or rollback success in the form of a method decorator in the form of a listener.
 
@@ -272,7 +308,7 @@ async createUser(...param: unknown[]) {
 
 <br/>
 
-## Test Mocking
+## 7️⃣ Test Mocking
 
 ### Unit Test
 
@@ -338,7 +374,7 @@ When using the above method in integrated tests using `jest`, each test result i
 
 <br/>
 
-## API
+## 8️⃣ API
 
 ### Transaction Options
 
@@ -432,3 +468,36 @@ addTransactionalDataSource({ name: 'default', : new DataSource(...) });
 ```
 
 <br/>
+
+# ⛔️ Bug Report
+
+![GitHub issues](https://img.shields.io/github/issues-raw/KIMBEOBWOO/nestjs-transaction)
+
+### `@Transactonal` does not work when using an injected entity manager by `@InjectEntityManager`
+
+```ts
+@Injectable()
+export class UserService {
+  constructor(@InjectEntityManager() readonly entityManager: EntityManager) {}
+
+  @Transactional()
+  updateUser(userId: string, data: Partial<User>) {
+    return this.entityManager.update(User, userId, data);
+  }
+}
+```
+
+- Error reported in **nested transactions**
+
+<br/>
+
+# 👍 Stay in touch
+
+Author/Developer - [KIMBEOBWOO](https://github.com/KIMBEOBWOO)
+
+<br/>
+
+# 📜 License
+
+- It's a fork of [typeorm-transactional](https://github.com/Aliheym/typeorm-transactional)
+- It's [MIT licensed](LICENSE).
