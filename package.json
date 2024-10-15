@@ -41,7 +41,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@toss/nestjs-aop": "^2.1.2",
+    "@toss/nestjs-aop": "^2.1.6",
     "eventemitter2": "^6.4.9"
   },
   "peerDependencies": {
