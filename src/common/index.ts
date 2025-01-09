@@ -6,6 +6,7 @@ import {
   TYPEORM_ENTITY_MANAGER_NAME,
   TYPEORM_DEFAULT_DATA_SOURCE_NAME,
   TYPEORM_DATA_SOURCE_NAME,
+  TYPEORM_ENTITY_MANAGER_QUERY_RUNNER_NAME,
 } from './constants';
 
 export * from './constants';
@@ -77,6 +78,31 @@ export const addTransactionalDataSource = (input: AddTransactionalDataSourceInpu
     },
     set(manager: EntityManager) {
       originalManager = manager;
+    },
+  });
+
+  /**
+   * Redeclare {EntityManager.queryRunner} to get queryRunner from context
+   * - see https://github.com/typeorm/typeorm/blob/master/src/persistence/EntityPersistExecutor.ts#L20
+   * - If queryRunner is exist in context, return context queryRunner
+   * - If queryRunner is not exist in context, return original queryRunner
+   */
+  Object.defineProperty(dataSource.manager, 'queryRunner', {
+    configurable: true,
+    get() {
+      const originalQueryRunner = this[TYPEORM_ENTITY_MANAGER_QUERY_RUNNER_NAME] as QueryRunner;
+      const storedQueryRunner = getStoreQueryRunner(
+        this.connection[TYPEORM_DATA_SOURCE_NAME] as DataSourceName,
+      );
+
+      if (storedQueryRunner) {
+        return storedQueryRunner;
+      }
+
+      return originalQueryRunner;
+    },
+    set(queryRunner: QueryRunner) {
+      this[TYPEORM_ENTITY_MANAGER_QUERY_RUNNER_NAME] = queryRunner;
     },
   });
 
