@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { getDataSourceToken, getEntityManagerToken, getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { runInTransaction } from '../../src';
 import { AppModule, Log, LOG_DB_NAME, RollbackError, User } from '../fixtures';
 import { getCurrentTransactionId } from '../utils';
@@ -43,13 +43,14 @@ describe('Multiple Database @Transactional in Nest.js', () => {
    * Transaction Aspect is applicable when using the following sources
    */
   const managerGetters = [
-    /**
-     * @NOTE not working
-     */
-    // {
-    //   name: '@InjectEntityManager',
-    //   source: () => app.get<EntityManager>(getEntityManagerToken()),
-    // },
+    {
+      name: '@InjectEntityManager',
+      source: () => app.get<EntityManager>(getEntityManagerToken()),
+      /**
+       * TODO : fix app.get<EntityManager>(getEntityManagerToken(LOG_DB_NAME))
+       */
+      source2: () => app.get(getDataSourceToken(LOG_DB_NAME)).manager,
+    },
     {
       name: '@InjectDataSource',
       source: () => app.get(getDataSourceToken()).manager,

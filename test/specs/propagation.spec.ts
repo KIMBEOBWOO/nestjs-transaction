@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getEntityManagerToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { runInTransaction, Propagation } from '../../src';
 import { AppModule, LOG_DB_NAME, User, RollbackError } from '../fixtures';
@@ -50,6 +50,10 @@ describe('Propagtion', () => {
     {
       name: '@InjectRepository',
       source: () => app.get(getRepositoryToken(User)).manager,
+    },
+    {
+      name: '@InjectEntityManager',
+      source: () => app.get<EntityManager>(getEntityManagerToken()),
     },
   ];
 
