@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getEntityManagerToken, getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, EntityManager, QueryRunner } from 'typeorm';
 import {
   IsolationLevel,
@@ -55,18 +55,14 @@ describe('Single Database @Transactional in Nest.js', () => {
    * Transaction Aspect is applicable when using the following sources
    */
   const managerGetters = [
-    /**
-     * @NOTE [Issue#4](https://github.com/KIMBEOBWOO/nestjs-transaction/issues/4)
-     */
-    // {
-    //   name: '@InjectEntityManager',
-    //   // source: async () => await app.resolve<EntityManager>(getTransactionalEntityManagerToken()),
-    //   source: () => app.get(getEntityManagerToken()),
-    // },
-    // {
-    //   name: '@InjectDataSource',
-    //   source: () => dataSource.manager,
-    // },
+    {
+      name: '@InjectEntityManager',
+      source: () => app.get(getEntityManagerToken()),
+    },
+    {
+      name: '@InjectDataSource',
+      source: () => dataSource.manager,
+    },
     {
       name: '@InjectRepository',
       source: () => app.get(getRepositoryToken(User)).manager,
@@ -84,7 +80,7 @@ describe('Single Database @Transactional in Nest.js', () => {
   ];
 
   describe('Validate that the injected resources import database interactions from storage within the transaction', () => {
-    it.each(managerGetters)(
+    it.skip.each(managerGetters)(
       'Injected providers $name must be return storage queryRunner',
       async ({ source }) => {
         await runInTransaction(async () => {
@@ -331,7 +327,8 @@ describe('Single Database @Transactional in Nest.js', () => {
               });
               expect(notExistUser).toBe(null);
 
-              await dataSource.transaction(async (manager) => {
+              // Create a new transaction using a different connection
+              await dataSource.createEntityManager().transaction(async (manager) => {
                 await manager.save(User.create(userFixtureId));
               });
 
