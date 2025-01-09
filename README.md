@@ -50,7 +50,8 @@ To facilitate the use of [typeorm-transactional](https://github.com/Aliheym/type
     - [runOnTransactionRollBack](#runontransactionrollback)
     - [addTransactionalDataSource(input): DataSource](#addtransactionaldatasourceinput-datasource)
 - [⛔️ Bug Report](#️-bug-report)
-    - [`@Transactonal` does not work when using an injected entity manager by `@InjectEntityManager`](#transactonal-does-not-work-when-using-an-injected-entity-manager-by-injectentitymanager)
+    - [~~`@Transactonal` does not work when using an injected entity manager by `@InjectEntityManager`~~](#transactonal-does-not-work-when-using-an-injected-entity-manager-by-injectentitymanager)
+      - [Fixed in version v1.1.2](#fixed-in-version-v112httpswwwnpmjscompackagenestjs-transactionv112)
 - [👍 Stay in touch](#-stay-in-touch)
 - [📜 License](#-license)
 
@@ -473,7 +474,9 @@ addTransactionalDataSource({ name: 'default', : new DataSource(...) });
 
 ![GitHub issues](https://img.shields.io/github/issues-raw/KIMBEOBWOO/nestjs-transaction)
 
-### `@Transactonal` does not work when using an injected entity manager by `@InjectEntityManager`
+### ~~`@Transactonal` does not work when using an injected entity manager by `@InjectEntityManager`~~
+
+#### Fixed in version [v1.1.2](https://www.npmjs.com/package/nestjs-transaction/v/1.1.2)
 
 ```ts
 @Injectable()
